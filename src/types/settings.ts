@@ -78,6 +78,7 @@ export interface AppSettings {
   globalHotkey: string;
   soundEnabled: boolean;
   soundVolume: number;
+  pauseExternalMediaDuringBreak: boolean;
   reducedMotion: boolean;
   highContrast: boolean;
   themeId: string;

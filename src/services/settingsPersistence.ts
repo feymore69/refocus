@@ -6,6 +6,11 @@ const LEGACY_STORE_FILE = "look-away-settings.json";
 const STORE_FILE = "refocus-settings.json";
 const KEY = "app-state";
 
+const clampNumber = (value: unknown, min: number, max: number, fallback: number) => {
+  if (typeof value !== "number" || Number.isNaN(value) || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(value)));
+};
+
 let storePromise: Promise<Store> | null = null;
 const getStore = () => {
   if (!storePromise) {
@@ -55,6 +60,20 @@ const normalizeState = (state: PersistedState): PersistedState => ({
     smartPause: {
       ...state.settings.smartPause,
       activityDetectionEnabled: state.settings.smartPause.activityDetectionEnabled ?? false,
+    },
+    breakTierSettings: {
+      ...state.settings.breakTierSettings,
+      enabledTiers: (() => {
+        const next = (state.settings.breakTierSettings?.enabledTiers ?? ["micro"]).filter(
+          (tier) => tier === "micro" || tier === "long",
+        );
+        if (!next.includes("micro")) next.unshift("micro");
+        return Array.from(new Set(next));
+      })(),
+      shortBreakEvery: clampNumber(state.settings.breakTierSettings?.shortBreakEvery, 2, 20, 4),
+      longBreakEvery: clampNumber(state.settings.breakTierSettings?.longBreakEvery, 4, 20, 10),
+      shortBreakMinutes: clampNumber(state.settings.breakTierSettings?.shortBreakMinutes, 2, 10, 3),
+      longBreakMinutes: clampNumber(state.settings.breakTierSettings?.longBreakMinutes, 10, 30, 12),
     },
     enabledPromptCategories:
       state.settings.enabledPromptCategories && state.settings.enabledPromptCategories.length > 0

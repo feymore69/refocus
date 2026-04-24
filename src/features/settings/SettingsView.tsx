@@ -4,7 +4,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { SCHEDULE_PRESETS } from "../../data/presets";
 import { THEMES } from "../../data/themes";
 import { useAppStore } from "../../store/useAppStore";
-import type { AppSettings, CustomBreakLine, OverlayType, ReminderStyle, WeekdaySchedule } from "../../types/settings";
+import type { AppSettings, CustomBreakLine, OverlayType, WeekdaySchedule } from "../../types/settings";
+import { playReminderCue } from "../../services/soundService";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Range } from "../../components/ui/range";
@@ -17,12 +18,6 @@ type SettingsSection = "essentials" | "smart-pause" | "break-experience" | "data
 const overlayOptions: { label: string; value: OverlayType }[] = [
   { label: "Full", value: "fullscreen" },
   { label: "Modal", value: "modal" },
-];
-
-const styleOptions: { label: string; value: ReminderStyle }[] = [
-  { label: "Gentle", value: "gentle" },
-  { label: "Standard", value: "normal" },
-  { label: "Enforced", value: "chaotic" },
 ];
 
 const sectionItems: { id: SettingsSection; label: string }[] = [
@@ -97,31 +92,17 @@ export const SettingsView = () => {
     });
   };
 
-  const toggleBreakTier = (tier: "micro" | "short" | "long", checked: boolean) => {
-    const next = checked
-      ? Array.from(new Set([...settings.breakTierSettings.enabledTiers, tier]))
-      : settings.breakTierSettings.enabledTiers.filter((item) => item !== tier);
-    if (next.length === 0) return;
+  const toggleLongBreak = (checked: boolean) => {
     applySettingsPatch({
       breakTierSettings: {
         ...settings.breakTierSettings,
-        enabledTiers: next,
+        enabledTiers: checked ? ["micro", "long"] : ["micro"],
       },
     });
   };
 
   const playSoundPreview = () => {
-    if (!settings.soundEnabled) return;
-    const context = new AudioContext();
-    const oscillator = context.createOscillator();
-    const gainNode = context.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.value = 880;
-    gainNode.gain.value = Math.max(0, Math.min(1, settings.soundVolume / 100)) * 0.08;
-    oscillator.connect(gainNode);
-    gainNode.connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + 0.15);
+    void playReminderCue({ enabled: settings.soundEnabled, volume: settings.soundVolume });
   };
 
   const applyWeekdayBatch = (weekdays: WeekdaySchedule["weekday"][], patch: Partial<WeekdaySchedule>) => {
@@ -162,7 +143,6 @@ export const SettingsView = () => {
   const lastHistoryAt = historyCount > 0 ? Math.max(...stats.history.map((item) => item.actualTimestamp ?? item.timestamp)) : null;
   const smartPauseEnabled = settings.smartPause.activityDetectionEnabled;
   const workingHoursEnabled = settings.workingHoursEnabled;
-  const shortTierEnabled = settings.breakTierSettings.enabledTiers.includes("short");
   const longTierEnabled = settings.breakTierSettings.enabledTiers.includes("long");
 
   return (
@@ -475,7 +455,7 @@ export const SettingsView = () => {
           </p>
           <div className="mb-3 rounded-xl border border-white/15 bg-black/10 p-3">
             <div className="flex items-start justify-between gap-3">
-              <p className="text-xs uppercase tracking-wide text-white/70">Live preview</p>
+              <p className="text-xs uppercase tracking-wide text-white/70">Break popup configuration</p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" onClick={() => triggerReminder(true)}>
                   Test break popup
@@ -499,22 +479,18 @@ export const SettingsView = () => {
               </motion.div>
             </AnimatePresence>
             <div className="mt-2 space-y-1 text-xs text-[var(--muted)]">
-              <p>Intensity: {styleOptions.find((item) => item.value === settings.reminderStyle)?.label}</p>
               <p>Overlay: {settings.overlayType === "fullscreen" ? "Full-screen" : "Modal"}</p>
               <p>Sound: {settings.soundEnabled ? `On (${settings.soundVolume}%)` : "Off"}</p>
+              <p>
+                Media during break:{" "}
+                {settings.pauseExternalMediaDuringBreak ? "Pause and resume automatically" : "No media control"}
+              </p>
               <p>{settings.autoStartBreak ? "Break starts automatically when due." : "Break waits for manual start."}</p>
               <p>{settings.customMessages.length > 0 ? "Using custom break lines only." : "Using Refocus default break lines."}</p>
             </div>
           </div>
           <div className="grid gap-2 md:grid-cols-2">
-            <div>
-              <p className="mb-1 flex items-center gap-1 text-xs text-[var(--muted)]">
-                Reminder intensity
-                <SettingHint text="Gentle is subtle, Standard is balanced, Enforced is stronger." />
-              </p>
-              <Segmented<ReminderStyle> value={settings.reminderStyle} onChange={(value) => applySettingsPatch({ reminderStyle: value })} options={styleOptions} />
-            </div>
-            <div>
+            <div className="md:col-span-2">
               <p className="mb-1 flex items-center gap-1 text-xs text-[var(--muted)]">
                 Overlay type
                 <SettingHint text="Choose modal popup or full-screen break takeover." />
@@ -535,121 +511,66 @@ export const SettingsView = () => {
               checked={settings.soundEnabled}
               onChange={(value) => applySettingsPatch({ soundEnabled: value })}
               label="Reminder sound"
-              helpText="Play a short cue when the popup appears."
+              helpText="Play short cues when a break starts and when it ends."
             />
-            <Range
-              label="Sound volume"
-              helpText="Playback level for reminder sounds."
-              min={0}
-              max={100}
-              value={settings.soundVolume}
-              unit="%"
-              onChange={(value) => applySettingsPatch({ soundVolume: value })}
-              disabled={!settings.soundEnabled}
+            <Toggle
+              checked={settings.pauseExternalMediaDuringBreak}
+              onChange={(value) => applySettingsPatch({ pauseExternalMediaDuringBreak: value })}
+              label="Pause external media during breaks"
+              helpText="Best effort: pause currently playing audio/video when a break starts, then resume after the popup closes."
             />
+            <div className="md:col-span-2">
+              <Range
+                label="Sound volume"
+                helpText="Playback level for break sound cues."
+                min={0}
+                max={100}
+                value={settings.soundVolume}
+                unit="%"
+                onChange={(value) => applySettingsPatch({ soundVolume: value })}
+                disabled={!settings.soundEnabled}
+              />
+            </div>
           </div>
 
           <div className="mt-3 rounded-xl border border-white/15 bg-black/10 p-3">
             <p className="text-sm font-medium text-[var(--text)]">Break tiers</p>
-            <p className="text-xs text-[var(--muted)]">Configure each break type separately. Disabled tiers do not run.</p>
-            <div className="mt-2 space-y-2">
-              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-                <Toggle
-                  checked={settings.breakTierSettings.enabledTiers.includes("micro")}
-                  onChange={(checked) => toggleBreakTier("micro", checked)}
-                  label="Micro break"
+            <p className="text-xs text-[var(--muted)]">
+              Standard breaks use your main interval and break duration. Configure optional long breaks below.
+            </p>
+            <div className="mt-2 rounded-xl border border-white/10 bg-black/20 p-3">
+              <Toggle checked={longTierEnabled} onChange={toggleLongBreak} label="Enable long breaks" />
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                <Range
+                  label="Long break every"
+                  helpText="After how many work cycles to run a long break."
+                  min={4}
+                  max={20}
+                  step={1}
+                  value={settings.breakTierSettings.longBreakEvery}
+                  unit="cycles"
+                  onChange={(value) =>
+                    applySettingsPatch({
+                      breakTierSettings: { ...settings.breakTierSettings, longBreakEvery: value },
+                    })
+                  }
+                  disabled={!longTierEnabled}
                 />
-                <div className="mt-2">
-                  <Range
-                    label="Micro break length"
-                    helpText="Duration of micro breaks."
-                    min={10}
-                    max={180}
-                    step={5}
-                    value={settings.breakDurationSeconds}
-                    unit="s"
-                    onChange={(value) => applySettingsPatch({ breakDurationSeconds: value })}
-                    disabled={!settings.breakTierSettings.enabledTiers.includes("micro")}
-                  />
-                </div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-                <Toggle
-                  checked={settings.breakTierSettings.enabledTiers.includes("short")}
-                  onChange={(checked) => toggleBreakTier("short", checked)}
-                  label="Short break"
+                <Range
+                  label="Long break length"
+                  helpText="Duration of long breaks."
+                  min={10}
+                  max={20}
+                  step={1}
+                  value={settings.breakTierSettings.longBreakMinutes}
+                  unit="m"
+                  onChange={(value) =>
+                    applySettingsPatch({
+                      breakTierSettings: { ...settings.breakTierSettings, longBreakMinutes: value },
+                    })
+                  }
+                  disabled={!longTierEnabled}
                 />
-                <div className="mt-2 grid gap-2 md:grid-cols-2">
-                  <Range
-                    label="Short break every"
-                    helpText="After how many work cycles to run a short break."
-                    min={2}
-                    max={10}
-                    step={1}
-                    value={settings.breakTierSettings.shortBreakEvery}
-                    unit="cycles"
-                    onChange={(value) =>
-                      applySettingsPatch({
-                        breakTierSettings: { ...settings.breakTierSettings, shortBreakEvery: value },
-                      })
-                    }
-                    disabled={!shortTierEnabled}
-                  />
-                  <Range
-                    label="Short break length"
-                    helpText="Duration of short breaks."
-                    min={2}
-                    max={8}
-                    step={1}
-                    value={settings.breakTierSettings.shortBreakMinutes}
-                    unit="m"
-                    onChange={(value) =>
-                      applySettingsPatch({
-                        breakTierSettings: { ...settings.breakTierSettings, shortBreakMinutes: value },
-                      })
-                    }
-                    disabled={!shortTierEnabled}
-                  />
-                </div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-                <Toggle
-                  checked={settings.breakTierSettings.enabledTiers.includes("long")}
-                  onChange={(checked) => toggleBreakTier("long", checked)}
-                  label="Long break"
-                />
-                <div className="mt-2 grid gap-2 md:grid-cols-2">
-                  <Range
-                    label="Long break every"
-                    helpText="After how many work cycles to run a long break."
-                    min={4}
-                    max={20}
-                    step={1}
-                    value={settings.breakTierSettings.longBreakEvery}
-                    unit="cycles"
-                    onChange={(value) =>
-                      applySettingsPatch({
-                        breakTierSettings: { ...settings.breakTierSettings, longBreakEvery: value },
-                      })
-                    }
-                    disabled={!longTierEnabled}
-                  />
-                  <Range
-                    label="Long break length"
-                    helpText="Duration of long breaks."
-                    min={10}
-                    max={20}
-                    step={1}
-                    value={settings.breakTierSettings.longBreakMinutes}
-                    unit="m"
-                    onChange={(value) =>
-                      applySettingsPatch({
-                        breakTierSettings: { ...settings.breakTierSettings, longBreakMinutes: value },
-                      })
-                    }
-                    disabled={!longTierEnabled}
-                  />
-                </div>
               </div>
             </div>
           </div>

@@ -10,9 +10,131 @@ struct AppState {
     quitting: Mutex<bool>,
     close_to_tray: Mutex<bool>,
     overlay_lock: Mutex<bool>,
+    paused_media_sources: Mutex<Vec<String>>,
 }
 
 const OVERLAY_GUARD_PREFIX: &str = "overlay-guard-";
+const OVERLAY_GUARD_BOOTSTRAP_SCRIPT: &str = r#"
+(() => {
+  const ROOT_ID = 'refocus-guard-root';
+  const STYLE_ID = 'refocus-guard-style';
+
+  const block = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const renderGuard = () => {
+    if (!document.body || !document.head) return;
+
+    if (!document.getElementById(STYLE_ID)) {
+      const style = document.createElement('style');
+      style.id = STYLE_ID;
+      style.textContent = `
+        :root { color-scheme: dark; }
+        html, body {
+          width: 100%;
+          height: 100%;
+          margin: 0;
+          overflow: hidden;
+          font-family: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+          user-select: none;
+          cursor: not-allowed;
+          background:
+            radial-gradient(1200px 720px at 20% 30%, rgba(93, 180, 255, 0.24), transparent 62%),
+            radial-gradient(1100px 760px at 78% 40%, rgba(74, 255, 200, 0.22), transparent 62%),
+            linear-gradient(160deg, rgba(11, 24, 52, 0.97), rgba(6, 15, 34, 0.98));
+        }
+        .guard-root {
+          position: fixed;
+          inset: 0;
+          display: grid;
+          place-items: center;
+          padding: 28px;
+          color: rgba(239, 245, 255, 0.98);
+        }
+        .guard-card {
+          border-radius: 24px;
+          border: 1px solid rgba(176, 209, 255, 0.28);
+          background: linear-gradient(160deg, rgba(19, 33, 64, 0.7), rgba(11, 19, 38, 0.72));
+          box-shadow:
+            0 24px 60px rgba(2, 8, 20, 0.55),
+            inset 0 1px 0 rgba(255, 255, 255, 0.15);
+          backdrop-filter: blur(16px);
+          padding: 28px 30px;
+          max-width: min(500px, 80vw);
+          text-align: center;
+        }
+        .guard-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          height: 42px;
+          width: 42px;
+          border-radius: 999px;
+          margin-bottom: 12px;
+          font-size: 20px;
+          background: radial-gradient(circle at 30% 30%, rgba(83, 212, 255, 0.78), rgba(16, 55, 114, 0.8));
+          box-shadow: 0 0 22px rgba(76, 194, 255, 0.42);
+        }
+        .guard-title {
+          margin: 0;
+          font-size: 24px;
+          font-weight: 640;
+          letter-spacing: 0.01em;
+        }
+        .guard-sub {
+          margin: 10px 0 0;
+          font-size: 14px;
+          line-height: 1.55;
+          color: rgba(221, 234, 255, 0.88);
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    let root = document.getElementById(ROOT_ID);
+    if (!root) {
+      root = document.createElement('div');
+      root.id = ROOT_ID;
+      root.className = 'guard-root';
+      root.setAttribute('role', 'status');
+      root.setAttribute('aria-live', 'assertive');
+      root.innerHTML = `
+        <div class="guard-card">
+          <div class="guard-badge" aria-hidden="true">◉</div>
+          <p class="guard-title">Break in progress</p>
+          <p class="guard-sub">Refocus is active on your main display. Return there to continue your break.</p>
+        </div>
+      `;
+      document.body.innerHTML = '';
+      document.body.appendChild(root);
+    }
+
+    document.body.setAttribute('data-refocus-guard', 'true');
+  };
+
+  ['contextmenu', 'keydown', 'mousedown', 'mouseup', 'mousemove', 'touchstart', 'touchmove'].forEach((type) => {
+    window.addEventListener(type, block, { capture: true, passive: false });
+  });
+
+  const start = () => {
+    renderGuard();
+    const observer = new MutationObserver(() => {
+      if (!document.getElementById(ROOT_ID)) {
+        renderGuard();
+      }
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, { once: true });
+  } else {
+    start();
+  }
+})();
+"#;
 
 fn same_monitor(a: &tauri::Monitor, b: &tauri::Monitor) -> bool {
     a.position().x == b.position().x
@@ -43,7 +165,8 @@ fn create_overlay_guard_windows(app: &AppHandle) -> Result<(), String> {
             continue;
         }
 
-        WebviewWindowBuilder::new(app, label, WebviewUrl::App("overlay-guard.html".into()))
+        WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
+            .initialization_script(OVERLAY_GUARD_BOOTSTRAP_SCRIPT)
             .decorations(false)
             .resizable(false)
             .maximizable(false)
@@ -144,6 +267,231 @@ fn hide_main_window(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn pause_external_media(state: tauri::State<AppState>) -> Result<bool, String> {
+    let paused_sources = pause_external_media_impl()?;
+    let paused_any = !paused_sources.is_empty();
+    let mut paused_state = state
+        .paused_media_sources
+        .lock()
+        .map_err(|err| err.to_string())?;
+    *paused_state = paused_sources;
+    Ok(paused_any)
+}
+
+#[tauri::command]
+fn resume_external_media(state: tauri::State<AppState>) -> Result<bool, String> {
+    let paused_sources = {
+        let mut paused_state = state
+            .paused_media_sources
+            .lock()
+            .map_err(|err| err.to_string())?;
+        let copy = paused_state.clone();
+        paused_state.clear();
+        copy
+    };
+
+    if paused_sources.is_empty() {
+        return Ok(false);
+    }
+
+    resume_external_media_impl(&paused_sources)
+}
+
+#[cfg(target_os = "windows")]
+fn pause_external_media_impl() -> Result<Vec<String>, String> {
+    let mut paused_sources = pause_media_sessions_with_smtc().unwrap_or_default();
+    if paused_sources.is_empty() {
+        let fallback_toggled = pause_media_with_hardware_toggle_if_needed().unwrap_or(false);
+        if fallback_toggled {
+            paused_sources.push("system-media-toggle".to_string());
+        }
+    }
+    Ok(paused_sources)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn pause_external_media_impl() -> Result<Vec<String>, String> {
+    Ok(Vec::new())
+}
+
+#[cfg(target_os = "windows")]
+fn resume_external_media_impl(paused_sources: &[String]) -> Result<bool, String> {
+    if paused_sources.is_empty() {
+        return Ok(false);
+    }
+
+    if paused_sources
+        .iter()
+        .any(|source| source == "system-media-toggle")
+    {
+        send_media_play_pause_toggle()?;
+        return Ok(true);
+    }
+
+    Ok(resume_media_sessions_with_smtc(paused_sources).unwrap_or(false))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn resume_external_media_impl(_paused_sources: &[String]) -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(target_os = "windows")]
+fn send_media_play_pause_toggle() -> Result<(), String> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        keybd_event, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, VK_MEDIA_PLAY_PAUSE,
+    };
+
+    unsafe {
+        keybd_event(
+            VK_MEDIA_PLAY_PAUSE.0 as u8,
+            0,
+            KEYBD_EVENT_FLAGS(0),
+            0,
+        );
+        keybd_event(VK_MEDIA_PLAY_PAUSE.0 as u8, 0, KEYEVENTF_KEYUP, 0);
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn pause_media_sessions_with_smtc() -> Result<Vec<String>, String> {
+    use windows::Media::Control::{
+        GlobalSystemMediaTransportControlsSessionManager,
+        GlobalSystemMediaTransportControlsSessionPlaybackStatus,
+    };
+
+    let manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
+        .map_err(|err| err.to_string())?
+        .get()
+        .map_err(|err| err.to_string())?;
+
+    let sessions = manager.GetSessions().map_err(|err| err.to_string())?;
+    let total = sessions.Size().map_err(|err| err.to_string())?;
+    let mut paused_sources: Vec<String> = Vec::new();
+
+    for index in 0..total {
+        let session = match sessions.GetAt(index) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        let playback_info = match session.GetPlaybackInfo() {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        let status = match playback_info.PlaybackStatus() {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        if status != GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing {
+            continue;
+        }
+        let paused = session
+            .TryPauseAsync()
+            .ok()
+            .and_then(|operation| operation.get().ok())
+            .unwrap_or(false)
+            || session
+                .TryTogglePlayPauseAsync()
+                .ok()
+                .and_then(|operation| operation.get().ok())
+                .unwrap_or(false);
+        if paused {
+            let source = session
+                .SourceAppUserModelId()
+                .map(|id| id.to_string())
+                .unwrap_or_else(|_| format!("session-{index}"));
+            paused_sources.push(source);
+        }
+    }
+
+    paused_sources.sort();
+    paused_sources.dedup();
+    Ok(paused_sources)
+}
+
+#[cfg(target_os = "windows")]
+fn resume_media_sessions_with_smtc(paused_sources: &[String]) -> Result<bool, String> {
+    use std::collections::HashSet;
+    use windows::Media::Control::{
+        GlobalSystemMediaTransportControlsSessionManager,
+        GlobalSystemMediaTransportControlsSessionPlaybackStatus,
+    };
+
+    let manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
+        .map_err(|err| err.to_string())?
+        .get()
+        .map_err(|err| err.to_string())?;
+
+    let sessions = manager.GetSessions().map_err(|err| err.to_string())?;
+    let total = sessions.Size().map_err(|err| err.to_string())?;
+    let targets: HashSet<&str> = paused_sources.iter().map(String::as_str).collect();
+    let mut resumed_any = false;
+
+    for index in 0..total {
+        let session = match sessions.GetAt(index) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        let source = session
+            .SourceAppUserModelId()
+            .map(|id| id.to_string())
+            .unwrap_or_else(|_| format!("session-{index}"));
+        if !targets.contains(source.as_str()) {
+            continue;
+        }
+        let playback_info = match session.GetPlaybackInfo() {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        if matches!(
+            playback_info.PlaybackStatus(),
+            Ok(status) if status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing
+        ) {
+            continue;
+        }
+        let resumed = session
+            .TryPlayAsync()
+            .ok()
+            .and_then(|operation| operation.get().ok())
+            .unwrap_or(false)
+            || session
+                .TryTogglePlayPauseAsync()
+                .ok()
+                .and_then(|operation| operation.get().ok())
+                .unwrap_or(false);
+        if resumed {
+            resumed_any = true;
+        }
+    }
+
+    Ok(resumed_any)
+}
+
+#[cfg(target_os = "windows")]
+fn pause_media_with_hardware_toggle_if_needed() -> Result<bool, String> {
+    use windows::Media::Control::{
+        GlobalSystemMediaTransportControlsSessionManager,
+        GlobalSystemMediaTransportControlsSessionPlaybackStatus,
+    };
+
+    let manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
+        .map_err(|err| err.to_string())?
+        .get()
+        .map_err(|err| err.to_string())?;
+
+    let current = manager.GetCurrentSession().map_err(|err| err.to_string())?;
+    let playback_info = current.GetPlaybackInfo().map_err(|err| err.to_string())?;
+    let status = playback_info.PlaybackStatus().map_err(|err| err.to_string())?;
+    if status != GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing {
+        return Ok(false);
+    }
+
+    send_media_play_pause_toggle()?;
+    Ok(true)
+}
+
 fn build_tray(app: &App) -> tauri::Result<()> {
     let start_break = MenuItem::with_id(app, "start-break", "Start break now", true, None::<&str>)?;
     let pause_5m = MenuItem::with_id(app, "pause-5m", "Snooze 5 minutes", true, None::<&str>)?;
@@ -221,6 +569,7 @@ pub fn run() {
             quitting: Mutex::new(false),
             close_to_tray: Mutex::new(true),
             overlay_lock: Mutex::new(false),
+            paused_media_sources: Mutex::new(Vec::new()),
         })
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
@@ -266,7 +615,9 @@ pub fn run() {
             quit_app,
             show_main_window,
             hide_main_window,
-            set_overlay_lock
+            set_overlay_lock,
+            pause_external_media,
+            resume_external_media
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

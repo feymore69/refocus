@@ -15,6 +15,8 @@ import { syncAutostart } from "./services/autostartService";
 import { bindTrayEvents, setTrayCountdown } from "./services/trayService";
 import { configureOverlayWindow, dismissOverlayWindow, reclaimOverlayFocus } from "./services/overlayController";
 import { notifyReminder } from "./services/notificationService";
+import { pauseExternalMedia, resumeExternalMedia } from "./services/systemMediaService";
+import { playBreakCompleteCue, playReminderCue } from "./services/soundService";
 import { useAppStore } from "./store/useAppStore";
 import { msToCountdown } from "./lib/time";
 
@@ -40,6 +42,7 @@ const App = () => {
   const recordInteraction = useAppStore((s) => s.recordInteraction);
   const toPersistedState = useAppStore((s) => s.toPersistedState);
   const previousOverlayPhaseRef = useRef(overlay.phase);
+  const pausedExternalMediaRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -84,9 +87,15 @@ const App = () => {
 
   useEffect(() => {
     if (!booted) return;
-    void syncAutostart(settings.startOnBoot);
-    void invoke("set_close_to_tray", { enabled: settings.liveInTray });
-    void registerBreakHotkey(settings.globalHotkey, () => triggerReminder(true));
+    void syncAutostart(settings.startOnBoot).catch((error) => {
+      console.error("Autostart setup failed", error);
+    });
+    void invoke("set_close_to_tray", { enabled: settings.liveInTray }).catch((error) => {
+      console.error("Failed to sync close-to-tray setting", error);
+    });
+    void registerBreakHotkey(settings.globalHotkey, () => triggerReminder(true)).catch((error) => {
+      console.error("Global hotkey setup failed", error);
+    });
   }, [booted, settings.startOnBoot, settings.globalHotkey, settings.liveInTray, triggerReminder]);
 
   useEffect(() => {
@@ -122,6 +131,9 @@ const App = () => {
     if (!booted) return;
     const previousPhase = previousOverlayPhaseRef.current;
     const popupVisible = overlay.phase !== "hidden";
+    const enteringPopup = popupVisible && previousPhase === "hidden";
+    const enteringCompleting = overlay.phase === "completing" && previousPhase !== "completing";
+    const leavingPopup = overlay.phase === "hidden" && previousPhase !== "hidden";
 
     if (popupVisible) {
       void (async () => {
@@ -140,7 +152,7 @@ const App = () => {
           console.error("Failed to configure overlay window", error);
         }
       })();
-    } else if (previousPhase !== "hidden") {
+    } else if (leavingPopup) {
       void (async () => {
         try {
           await invoke("set_overlay_lock", { enabled: false });
@@ -160,12 +172,52 @@ const App = () => {
       })();
     }
 
-    if (overlay.phase === "prompt" && previousPhase !== "prompt") {
-      void notifyReminder("Refocus", overlay.message);
+    if (enteringPopup) {
+      void notifyReminder("Refocus", overlay.message).catch((error) => {
+        console.error("Notification failed", error);
+      });
+      void playReminderCue({ enabled: settings.soundEnabled, volume: settings.soundVolume }).catch((error) => {
+        console.error("Reminder cue failed", error);
+      });
+    }
+
+    if (enteringPopup && settings.pauseExternalMediaDuringBreak) {
+      void pauseExternalMedia()
+        .then((paused) => {
+          pausedExternalMediaRef.current = paused;
+        })
+        .catch((error) => {
+          console.error("Pause external media failed", error);
+          pausedExternalMediaRef.current = false;
+        });
+    }
+
+    if (enteringCompleting) {
+      void playBreakCompleteCue({ enabled: settings.soundEnabled, volume: settings.soundVolume }).catch((error) => {
+        console.error("Break complete cue failed", error);
+      });
+    }
+
+    if (leavingPopup && pausedExternalMediaRef.current) {
+      void resumeExternalMedia()
+        .catch((error) => {
+          console.error("Resume external media failed", error);
+        })
+        .finally(() => {
+          pausedExternalMediaRef.current = false;
+        });
     }
 
     previousOverlayPhaseRef.current = overlay.phase;
-  }, [booted, overlay.phase, overlay.message, settings.overlayType]);
+  }, [
+    booted,
+    overlay.phase,
+    overlay.message,
+    settings.overlayType,
+    settings.soundEnabled,
+    settings.soundVolume,
+    settings.pauseExternalMediaDuringBreak,
+  ]);
 
   useEffect(() => {
     if (!booted) return;

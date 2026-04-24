@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   globalHotkey: "CommandOrControl+Shift+B",
   soundEnabled: true,
   soundVolume: 65,
+  pauseExternalMediaDuringBreak: false,
   reducedMotion: false,
   highContrast: false,
   themeId: "aurora",
@@ -51,7 +52,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     allowlistedApps: [],
   },
   breakTierSettings: {
-    enabledTiers: ["micro", "short"],
+    enabledTiers: ["micro", "long"],
     shortBreakEvery: 4,
     longBreakEvery: 10,
     shortBreakMinutes: 3,

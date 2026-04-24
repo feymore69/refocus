@@ -124,11 +124,10 @@ const isNowWithinSchedule = (settings: AppSettings, now: Date) => {
 };
 
 const selectBreakTier = (session: SessionState, settings: AppSettings): BreakTier => {
-  const { enabledTiers, shortBreakEvery, longBreakEvery } = settings.breakTierSettings;
+  const { enabledTiers, longBreakEvery } = settings.breakTierSettings;
   const cycle = session.workCyclesCompletedToday + 1;
   if (enabledTiers.includes("long") && cycle % Math.max(1, longBreakEvery) === 0) return "long";
-  if (enabledTiers.includes("short") && cycle % Math.max(1, shortBreakEvery) === 0) return "short";
-  return enabledTiers.includes("micro") ? "micro" : "short";
+  return "micro";
 };
 
 const breakSecondsForTier = (tier: BreakTier, settings: AppSettings) => {
@@ -278,11 +277,16 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set((state) => {
       if (!forced && (state.overlay.phase !== "hidden" || state.session.isPaused)) return state;
       const scheduledFor = forced ? Date.now() : state.session.nextBreakAt;
+      const selectedTier = selectBreakTier(state.session, state.settings);
+      const isScheduledReminder = !forced;
       return {
         overlay: buildOverlay(state, { initiatedByUser: !!forced, scheduledFor, snoozeCount: 0 }),
         session: {
           ...state.session,
-          activeBreakTier: selectBreakTier(state.session, state.settings),
+          activeBreakTier: selectedTier,
+          workCyclesCompletedToday: isScheduledReminder
+            ? state.session.workCyclesCompletedToday + 1
+            : state.session.workCyclesCompletedToday,
           pendingDueBreak: false,
         },
       };
@@ -506,7 +510,6 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
             ...nextSession,
             pendingDueBreak: false,
             currentFocusStreakSeconds: 0,
-            workCyclesCompletedToday: nextSession.workCyclesCompletedToday + 1,
             nextBreakAt: nextBreakTimestamp(state.settings),
           };
         } else {
@@ -535,11 +538,13 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         if (typingAware && currentlyTyping) {
           nextSession.pendingDueBreak = true;
         } else {
+          const selectedTier = selectBreakTier(nextSession, state.settings);
           nextOverlay = buildOverlay(
             { settings: state.settings, session: nextSession },
             { initiatedByUser: false, scheduledFor: nextSession.nextBreakAt, snoozeCount: 0 },
           );
-          nextSession.activeBreakTier = selectBreakTier(nextSession, state.settings);
+          nextSession.activeBreakTier = selectedTier;
+          nextSession.workCyclesCompletedToday += 1;
           nextSession.pendingDueBreak = false;
         }
       }
@@ -548,11 +553,13 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         const typingDeferralMs = state.settings.smartPause.typingDeferralSeconds * 1000;
         const typingStopped = now - nextSession.lastInteractionAt >= typingDeferralMs;
         if (typingStopped || !activityEnabled) {
+          const selectedTier = selectBreakTier(nextSession, state.settings);
           nextOverlay = buildOverlay(
             { settings: state.settings, session: nextSession },
             { initiatedByUser: false, scheduledFor: nextSession.nextBreakAt, snoozeCount: 0 },
           );
-          nextSession.activeBreakTier = selectBreakTier(nextSession, state.settings);
+          nextSession.activeBreakTier = selectedTier;
+          nextSession.workCyclesCompletedToday += 1;
           nextSession.pendingDueBreak = false;
         }
       }
