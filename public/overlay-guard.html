@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Refocus Guard</title>
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      body {
+        font-family: Inter, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 30% 30%, rgba(56, 189, 248, 0.15), transparent 36%),
+          radial-gradient(circle at 70% 70%, rgba(16, 185, 129, 0.14), transparent 34%),
+          rgba(2, 6, 23, 0.88);
+        color: rgba(241, 245, 249, 0.92);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        cursor: not-allowed;
+      }
+
+      .chip {
+        border: 1px solid rgba(148, 163, 184, 0.32);
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="chip">Break lock active on this display</div>
+  </body>
+</html>

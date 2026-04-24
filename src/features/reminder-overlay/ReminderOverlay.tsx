@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/cn";
-import { dismissOverlayWindow } from "../../services/overlayController";
 import { useAppStore } from "../../store/useAppStore";
 
 const modeBackdrop: Record<string, string> = {
@@ -60,7 +59,7 @@ export const ReminderOverlay = () => {
   }, [overlay.phase]);
 
   useEffect(() => {
-    if (!settings.strictMode || overlay.phase === "hidden") return;
+    if (overlay.phase === "hidden") return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -86,7 +85,7 @@ export const ReminderOverlay = () => {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [overlay.phase, settings.strictMode]);
+  }, [overlay.phase]);
 
   useEffect(() => {
     if (!emergencyConfirm) return;
@@ -113,14 +112,12 @@ export const ReminderOverlay = () => {
 
   useEffect(() => clearHold, []);
 
-  const executeSnooze = async () => {
+  const executeSnooze = () => {
     snoozeBreak();
-    await dismissOverlayWindow(settings.liveInTray);
   };
 
-  const executeSkip = async (reason?: string) => {
+  const executeSkip = (reason?: string) => {
     skipBreak(reason);
-    await dismissOverlayWindow(settings.liveInTray);
   };
 
   const startSkipHold = () => {
@@ -138,7 +135,7 @@ export const ReminderOverlay = () => {
     };
     holdFrameRef.current = window.requestAnimationFrame(animate);
     holdTimerRef.current = window.setTimeout(() => {
-      void executeSkip("Skipped with enforced hold-to-skip");
+      executeSkip("Skipped with enforced hold-to-skip");
       clearHold();
     }, HOLD_TO_SKIP_MS);
   };
@@ -201,6 +198,7 @@ export const ReminderOverlay = () => {
                 ? "Nice reset. Returning you to your workflow."
                 : overlay.subMessage || "Look away, blink slowly, and reset your posture."}
             </p>
+            {!completionVisible ? <p className="mt-1 text-xs text-white/65">Break mode is active on every connected display.</p> : null}
 
             {isEnforced && !completionVisible ? (
               <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/12 px-2 py-1 text-xs text-white/90">
@@ -255,7 +253,7 @@ export const ReminderOverlay = () => {
                     Start break
                   </Button>
                 ) : null}
-                <Button variant={isEnforced ? "ghost" : "secondary"} onClick={() => void executeSnooze()}>
+                <Button variant={isEnforced ? "ghost" : "secondary"} onClick={executeSnooze}>
                   <TimerReset className="h-4 w-4" />
                   Snooze
                 </Button>
@@ -279,7 +277,7 @@ export const ReminderOverlay = () => {
                     </span>
                   </button>
                 ) : (
-                  <Button variant="ghost" onClick={() => void executeSkip()}>
+                  <Button variant="ghost" onClick={() => executeSkip()}>
                     <SkipForward className="h-4 w-4" />
                     Skip
                   </Button>
@@ -303,7 +301,6 @@ export const ReminderOverlay = () => {
                     onClick={() => {
                       setEmergencyConfirm(false);
                       closeOverlay();
-                      void dismissOverlayWindow(settings.liveInTray);
                     }}
                     className="text-xs text-amber-200 underline decoration-amber-200/50 underline-offset-4"
                   >

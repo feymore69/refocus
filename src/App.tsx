@@ -124,13 +124,40 @@ const App = () => {
     const popupVisible = overlay.phase !== "hidden";
 
     if (popupVisible) {
-      void configureOverlayWindow(settings.overlayType, {
-        breakActive: true,
-        enforceFocus: settings.strictMode && (overlay.phase === "active" || overlay.phase === "completing"),
-        popupVisible: true,
-      });
+      void (async () => {
+        try {
+          await invoke("set_overlay_lock", { enabled: true });
+        } catch (error) {
+          console.error("Failed to enable overlay lock", error);
+        }
+        try {
+          await configureOverlayWindow(settings.overlayType, {
+            breakActive: true,
+            enforceFocus: true,
+            popupVisible: true,
+          });
+        } catch (error) {
+          console.error("Failed to configure overlay window", error);
+        }
+      })();
     } else if (previousPhase !== "hidden") {
-      void dismissOverlayWindow(true);
+      void (async () => {
+        try {
+          await invoke("set_overlay_lock", { enabled: false });
+        } catch (error) {
+          console.error("Failed to release overlay lock", error);
+        }
+        try {
+          await dismissOverlayWindow(true);
+        } catch (error) {
+          console.error("Failed to dismiss overlay window", error);
+        }
+        try {
+          await invoke("hide_main_window");
+        } catch (error) {
+          console.error("Failed to hide main window", error);
+        }
+      })();
     }
 
     if (overlay.phase === "prompt" && previousPhase !== "prompt") {
@@ -138,24 +165,23 @@ const App = () => {
     }
 
     previousOverlayPhaseRef.current = overlay.phase;
-  }, [booted, overlay.phase, overlay.message, settings.overlayType, settings.strictMode]);
+  }, [booted, overlay.phase, overlay.message, settings.overlayType]);
 
   useEffect(() => {
     if (!booted) return;
-    if (!settings.strictMode) return;
-    if (overlay.phase !== "active" && overlay.phase !== "completing") return;
+    if (overlay.phase === "hidden") return;
     const onBlur = () => {
       window.setTimeout(() => {
         const state = useAppStore.getState();
         const phase = state.overlay.phase;
-        if ((phase === "active" || phase === "completing") && state.settings.strictMode) {
+        if (phase !== "hidden") {
           void reclaimOverlayFocus();
         }
       }, 80);
     };
     window.addEventListener("blur", onBlur);
     return () => window.removeEventListener("blur", onBlur);
-  }, [booted, overlay.phase, settings.strictMode]);
+  }, [booted, overlay.phase]);
 
   useEffect(() => {
     const theme = THEMES.find((item) => item.id === settings.themeId) ?? FALLBACK_THEME;
