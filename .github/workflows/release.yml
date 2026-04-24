@@ -10,6 +10,7 @@ jobs:
   publish-tauri:
     permissions:
       contents: write
+      actions: read
     strategy:
       fail-fast: false
       matrix:
@@ -64,3 +65,43 @@ jobs:
           releaseBody: "Automated build for Refocus __VERSION__."
           releaseDraft: false
           prerelease: true
+
+      - name: Collect unsigned Windows artifacts for SignPath
+        if: matrix.platform == 'windows-latest' && secrets.SIGNPATH_API_TOKEN != ''
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path signpath-input | Out-Null
+          $bundleRoot = "src-tauri/target/release/bundle"
+          Get-ChildItem "$bundleRoot/msi" -Recurse -File -ErrorAction SilentlyContinue | Copy-Item -Destination signpath-input -Force
+          Get-ChildItem "$bundleRoot/nsis" -Recurse -File -ErrorAction SilentlyContinue | Copy-Item -Destination signpath-input -Force
+          $count = (Get-ChildItem signpath-input -File -ErrorAction SilentlyContinue | Measure-Object).Count
+          if ($count -eq 0) { throw "No Windows artifacts found for signing." }
+
+      - name: Upload unsigned artifacts to GitHub
+        id: upload-unsigned-artifact
+        if: matrix.platform == 'windows-latest' && secrets.SIGNPATH_API_TOKEN != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-windows-bundle
+          path: signpath-input/*
+
+      - name: Sign Windows artifacts via SignPath
+        id: signpath
+        if: matrix.platform == 'windows-latest' && secrets.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned-artifact.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signpath-signed
+
+      - name: Upload signed Windows artifacts to GitHub Release
+        if: matrix.platform == 'windows-latest' && secrets.SIGNPATH_API_TOKEN != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            signpath-signed/**/*

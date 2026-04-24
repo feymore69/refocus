@@ -154,7 +154,31 @@ Optional updater signing secrets:
 - `TAURI_SIGNING_PRIVATE_KEY`
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
 
-Windows code signing is certificate-provider specific. Add your provider's signing step to the workflow once you have a code signing certificate.
+### Windows signing (recommended free path for open source)
+
+For public open-source projects, apply to the SignPath Foundation free certificate program:
+
+- https://about.signpath.io/product/open-source
+
+This repository is already wired to sign Windows artifacts automatically via SignPath when the following secrets are set:
+
+- `SIGNPATH_API_TOKEN`
+- `SIGNPATH_ORGANIZATION_ID`
+- `SIGNPATH_PROJECT_SLUG`
+- `SIGNPATH_SIGNING_POLICY_SLUG`
+
+The release workflow will:
+1. Build Windows installers
+2. Submit them to SignPath
+3. Upload signed files back to the GitHub Release
+
+If SignPath is not configured, the workflow still publishes unsigned artifacts.
+
+### Windows paid alternative
+
+If you need immediate production-grade signing without SignPath onboarding, use Azure Artifact Signing:
+
+- https://azure.microsoft.com/en-us/products/trusted-signing
 
 ## Notes
 
