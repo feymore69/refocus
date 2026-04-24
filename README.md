@@ -117,6 +117,45 @@ Tauri places platform installers/bundles under:
 
 `src-tauri/target/release/bundle/`
 
+## Publish for download (GitHub Releases)
+
+This repo includes an automated release workflow at:
+
+`.github/workflows/release.yml`
+
+How to publish:
+
+1. Bump versions in:
+   - `package.json`
+   - `src-tauri/tauri.conf.json`
+2. Commit and push to `main`
+3. Create and push a version tag:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The workflow builds desktop bundles on Windows/macOS/Linux and uploads them to a GitHub Release.
+
+## Signed builds
+
+Unsigned builds work for testing but show OS warnings. To enable signing in CI, add repository secrets:
+
+- `APPLE_CERTIFICATE` (base64 .p12)
+- `APPLE_CERTIFICATE_PASSWORD`
+- `APPLE_SIGNING_IDENTITY`
+- `APPLE_ID`
+- `APPLE_PASSWORD` (app-specific password)
+- `APPLE_TEAM_ID`
+
+Optional updater signing secrets:
+
+- `TAURI_SIGNING_PRIVATE_KEY`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+
+Windows code signing is certificate-provider specific. Add your provider's signing step to the workflow once you have a code signing certificate.
+
 ## Notes
 
 - All stats and settings are local-only.
