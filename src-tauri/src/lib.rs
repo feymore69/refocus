@@ -3,7 +3,8 @@ use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    App, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder,
+    App, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewUrl,
+    WebviewWindowBuilder,
 };
 
 struct AppState {
@@ -165,7 +166,20 @@ fn create_overlay_guard_windows(app: &AppHandle) -> Result<(), String> {
             continue;
         }
 
-        WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
+        // Use explicit physical bounds to avoid mixed-DPI logical conversion drift.
+        let overscan_px: i32 = 4;
+        let physical_x = monitor.position().x.saturating_sub(overscan_px);
+        let physical_y = monitor.position().y.saturating_sub(overscan_px);
+        let physical_width = monitor
+            .size()
+            .width
+            .saturating_add((overscan_px * 2) as u32);
+        let physical_height = monitor
+            .size()
+            .height
+            .saturating_add((overscan_px * 2) as u32);
+
+        let guard_window = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
             .initialization_script(OVERLAY_GUARD_BOOTSTRAP_SCRIPT)
             .decorations(false)
             .resizable(false)
@@ -175,9 +189,17 @@ fn create_overlay_guard_windows(app: &AppHandle) -> Result<(), String> {
             .always_on_top(true)
             .skip_taskbar(true)
             .focused(false)
-            .position(monitor.position().x as f64, monitor.position().y as f64)
-            .inner_size(monitor.size().width as f64, monitor.size().height as f64)
             .build()
+            .map_err(|err| err.to_string())?;
+
+        guard_window
+            .set_position(Position::Physical(PhysicalPosition::new(physical_x, physical_y)))
+            .map_err(|err| err.to_string())?;
+        guard_window
+            .set_size(Size::Physical(PhysicalSize::new(
+                physical_width,
+                physical_height,
+            )))
             .map_err(|err| err.to_string())?;
     }
 
