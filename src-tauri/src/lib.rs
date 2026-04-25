@@ -144,21 +144,17 @@ fn same_monitor(a: &tauri::Monitor, b: &tauri::Monitor) -> bool {
         && a.size().height == b.size().height
 }
 
-fn create_overlay_guard_windows(app: &AppHandle) -> Result<(), String> {
+fn create_overlay_guard_windows(
+    app: &AppHandle,
+    excluded_monitor: Option<tauri::Monitor>,
+) -> Result<(), String> {
     close_overlay_guard_windows(app)?;
 
-    let main = app
-        .get_webview_window("main")
-        .ok_or_else(|| "Main window not found".to_string())?;
     let monitors = app.available_monitors().map_err(|err| err.to_string())?;
-    let main_monitor = main
-        .current_monitor()
-        .map_err(|err| err.to_string())?
-        .or_else(|| app.primary_monitor().ok().flatten());
 
     for (index, monitor) in monitors.iter().enumerate() {
         let label = format!("{}{}", OVERLAY_GUARD_PREFIX, index);
-        let on_main_monitor = main_monitor
+        let on_main_monitor = excluded_monitor
             .as_ref()
             .map(|current| same_monitor(current, monitor))
             .unwrap_or(false);
@@ -166,20 +162,13 @@ fn create_overlay_guard_windows(app: &AppHandle) -> Result<(), String> {
             continue;
         }
 
-        // Use explicit physical bounds to avoid mixed-DPI logical conversion drift.
-        let overscan_px: i32 = 4;
-        let physical_x = monitor.position().x.saturating_sub(overscan_px);
-        let physical_y = monitor.position().y.saturating_sub(overscan_px);
-        let physical_width = monitor
-            .size()
-            .width
-            .saturating_add((overscan_px * 2) as u32);
-        let physical_height = monitor
-            .size()
-            .height
-            .saturating_add((overscan_px * 2) as u32);
+        // Use monitor-exact physical bounds to avoid spillover into adjacent displays.
+        let physical_x = monitor.position().x;
+        let physical_y = monitor.position().y;
+        let physical_width = monitor.size().width;
+        let physical_height = monitor.size().height;
 
-        let guard_window = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
+        let guard_window = WebviewWindowBuilder::new(app, label, WebviewUrl::App("overlay-guard.html".into()))
             .initialization_script(OVERLAY_GUARD_BOOTSTRAP_SCRIPT)
             .decorations(false)
             .resizable(false)
@@ -188,6 +177,7 @@ fn create_overlay_guard_windows(app: &AppHandle) -> Result<(), String> {
             .closable(false)
             .always_on_top(true)
             .skip_taskbar(true)
+            .visible(false)
             .focused(false)
             .build()
             .map_err(|err| err.to_string())?;
@@ -201,6 +191,7 @@ fn create_overlay_guard_windows(app: &AppHandle) -> Result<(), String> {
                 physical_height,
             )))
             .map_err(|err| err.to_string())?;
+        guard_window.show().map_err(|err| err.to_string())?;
     }
 
     Ok(())
@@ -252,18 +243,31 @@ async fn set_overlay_lock(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
     enabled: bool,
+    fullscreen: bool,
 ) -> Result<(), String> {
     let mut overlay_lock = state.overlay_lock.lock().map_err(|err| err.to_string())?;
     *overlay_lock = enabled;
     drop(overlay_lock);
 
     if enabled {
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.unminimize();
-            let _ = window.set_focus();
-        }
-        create_overlay_guard_windows(&app)?;
+        let excluded_monitor = if let Some(window) = app.get_webview_window("main") {
+            if fullscreen {
+                let _ = window.set_decorations(false);
+                let _ = window.set_fullscreen(true);
+                let _ = window.set_always_on_top(true);
+            }
+            window
+                .current_monitor()
+                .map_err(|err| err.to_string())?
+                .or_else(|| app.primary_monitor().ok().flatten())
+        } else {
+            if fullscreen {
+                app.primary_monitor().ok().flatten()
+            } else {
+                None
+            }
+        };
+        create_overlay_guard_windows(&app, excluded_monitor)?;
     } else {
         close_overlay_guard_windows(&app)?;
     }

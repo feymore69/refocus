@@ -1,5 +1,11 @@
 import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
-import { UserAttentionType, availableMonitors, getCurrentWindow } from "@tauri-apps/api/window";
+import {
+  UserAttentionType,
+  availableMonitors,
+  currentMonitor,
+  getCurrentWindow,
+  primaryMonitor,
+} from "@tauri-apps/api/window";
 import type { OverlayType } from "../types/settings";
 
 interface WindowSnapshot {
@@ -7,10 +13,12 @@ interface WindowSnapshot {
   size: PhysicalSize;
   maximized: boolean;
   fullscreen: boolean;
+  decorated: boolean;
 }
 
 let snapshot: WindowSnapshot | null = null;
 let overlaySessionActive = false;
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const getVirtualDesktopBounds = async () => {
   const monitors = await availableMonitors();
@@ -30,7 +38,7 @@ const getVirtualDesktopBounds = async () => {
 };
 
 export const configureOverlayWindow = async (
-  _overlayType: OverlayType,
+  overlayType: OverlayType,
   options: { enforceFocus: boolean; breakActive: boolean; popupVisible: boolean },
 ) => {
   const window = getCurrentWindow();
@@ -42,11 +50,13 @@ export const configureOverlayWindow = async (
       window.isMaximized(),
       window.isFullscreen(),
     ]);
+    const decorated = await window.isDecorated();
     snapshot = {
       position: new PhysicalPosition(position.x, position.y),
       size: new PhysicalSize(size.width, size.height),
       maximized,
       fullscreen,
+      decorated,
     };
     overlaySessionActive = true;
   }
@@ -57,20 +67,70 @@ export const configureOverlayWindow = async (
   await window.unminimize();
   await window.setFocus();
   await window.setResizable(false);
-  await window.setFullscreen(false);
-  try {
-    if (await window.isMaximized()) {
-      await window.unmaximize();
-    }
-  } catch {
-    // Continue even if maximize state cannot be queried on some desktops.
-  }
-  if (virtualBounds) {
+
+  if (overlayType === "fullscreen") {
     try {
-      await window.setPosition(new PhysicalPosition(virtualBounds.x, virtualBounds.y));
-      await window.setSize(new PhysicalSize(virtualBounds.width, virtualBounds.height));
+      await window.setDecorations(false);
     } catch {
-      // Keep current position/size if desktop manager rejects spanning virtual bounds.
+      // Continue even if decoration control is unavailable.
+    }
+    try {
+      if (await window.isMaximized()) {
+        await window.unmaximize();
+      }
+    } catch {
+      // Continue if maximize state can't be queried.
+    }
+    const targetMonitor = (await currentMonitor()) ?? (await primaryMonitor());
+    if (targetMonitor) {
+      try {
+        await window.setPosition(new PhysicalPosition(targetMonitor.position.x, targetMonitor.position.y));
+        await window.setSize(new PhysicalSize(targetMonitor.size.width, targetMonitor.size.height));
+      } catch {
+        // Continue if monitor positioning is rejected by the window manager.
+      }
+    }
+    try {
+      await window.setSimpleFullscreen(true);
+    } catch {
+      // setSimpleFullscreen maps to fullscreen on Windows/Linux; ignore if unsupported.
+    }
+    if (!(await window.isFullscreen().catch(() => false))) {
+      await wait(40);
+    }
+    try {
+      await window.setFullscreen(true);
+    } catch {
+      // Fall back to a sized window if fullscreen is unsupported.
+    }
+    if (!(await window.isFullscreen().catch(() => false))) {
+      try {
+        await window.maximize();
+      } catch {
+        // Final fallback if fullscreen is blocked by the window manager.
+      }
+    }
+  } else {
+    await window.setFullscreen(false);
+    try {
+      await window.setDecorations(true);
+    } catch {
+      // Continue even if decoration control is unavailable.
+    }
+    try {
+      if (await window.isMaximized()) {
+        await window.unmaximize();
+      }
+    } catch {
+      // Continue even if maximize state cannot be queried on some desktops.
+    }
+    if (virtualBounds) {
+      try {
+        await window.setPosition(new PhysicalPosition(virtualBounds.x, virtualBounds.y));
+        await window.setSize(new PhysicalSize(virtualBounds.width, virtualBounds.height));
+      } catch {
+        // Keep current position/size if desktop manager rejects spanning virtual bounds.
+      }
     }
   }
   try {
@@ -92,6 +152,9 @@ export const releaseOverlayWindow = async () => {
     await window.setResizable(true);
   } catch {}
   try {
+    await window.setDecorations(snapshot?.decorated ?? true);
+  } catch {}
+  try {
     await window.setFullscreen(false);
   } catch {}
   try {
@@ -106,7 +169,10 @@ export const releaseOverlayWindow = async () => {
         await window.maximize();
       }
       if (snapshot.fullscreen) {
-        await window.setFullscreen(true);
+        await window.setSimpleFullscreen(true);
+      }
+      if (!snapshot.fullscreen && snapshot.decorated) {
+        await window.setDecorations(true);
       }
     } catch {}
   }

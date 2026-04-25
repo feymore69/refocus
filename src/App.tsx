@@ -138,11 +138,6 @@ const App = () => {
     if (popupVisible) {
       void (async () => {
         try {
-          await invoke("set_overlay_lock", { enabled: true });
-        } catch (error) {
-          console.error("Failed to enable overlay lock", error);
-        }
-        try {
           await configureOverlayWindow(settings.overlayType, {
             breakActive: true,
             enforceFocus: true,
@@ -151,11 +146,19 @@ const App = () => {
         } catch (error) {
           console.error("Failed to configure overlay window", error);
         }
+        try {
+          await invoke("set_overlay_lock", {
+            enabled: true,
+            fullscreen: settings.overlayType === "fullscreen",
+          });
+        } catch (error) {
+          console.error("Failed to enable overlay lock", error);
+        }
       })();
     } else if (leavingPopup) {
       void (async () => {
         try {
-          await invoke("set_overlay_lock", { enabled: false });
+          await invoke("set_overlay_lock", { enabled: false, fullscreen: false });
         } catch (error) {
           console.error("Failed to release overlay lock", error);
         }
