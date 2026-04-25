@@ -775,12 +775,13 @@ export const SettingsView = () => {
               Custom accent
               <SettingHint text="Override theme accent for action highlights." />
             </span>
-            <div className="mt-2 rounded-xl border border-white/20 bg-black/10 p-1">
+            <div className="relative mt-2 rounded-xl border border-white/20 bg-black/10 px-3 py-4">
+              <div className="h-2 rounded-full shadow-inner shadow-black/20" style={{ background: settings.customAccent }} />
               <input
                 type="color"
                 value={settings.customAccent}
                 onChange={(event) => applySettingsPatch({ customAccent: event.target.value })}
-                className="h-7 w-full cursor-pointer rounded-full border-0 bg-transparent p-0"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
               />
             </div>
           </label>
