@@ -38,14 +38,38 @@ export const ReminderOverlay = () => {
 
   useEffect(() => {
     if (overlay.phase !== "active" && overlay.phase !== "completing") return;
+
     let frame = 0;
-    const tick = () => {
+    let fallbackInterval = 0;
+    let active = true;
+
+    const syncNow = () => {
+      if (!active) return;
       setNowMs(Date.now());
+    };
+
+    const tick = () => {
+      syncNow();
       frame = window.requestAnimationFrame(tick);
     };
+
+    const handleVisibilityOrFocus = () => syncNow();
+
+    syncNow();
     frame = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frame);
-  }, [overlay.phase]);
+    // Fallback when animation frames are throttled by the window manager.
+    fallbackInterval = window.setInterval(syncNow, 120);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+
+    return () => {
+      active = false;
+      window.cancelAnimationFrame(frame);
+      window.clearInterval(fallbackInterval);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+    };
+  }, [overlay.phase, overlay.startedAt, overlay.durationMs]);
 
   useEffect(() => {
     if (overlay.phase === "hidden") return;
@@ -147,7 +171,8 @@ export const ReminderOverlay = () => {
 
   const remainingMs = useMemo(() => {
     if (overlay.phase !== "active" || !overlay.startedAt) return overlay.durationMs;
-    return Math.max(0, overlay.durationMs - (nowMs - overlay.startedAt));
+    const elapsedMs = Math.max(0, nowMs - overlay.startedAt);
+    return Math.max(0, overlay.durationMs - elapsedMs);
   }, [nowMs, overlay.durationMs, overlay.phase, overlay.startedAt]);
 
   const ringProgress = overlay.phase === "active" ? Math.max(0, remainingMs / Math.max(1, overlay.durationMs)) : 1;
@@ -225,7 +250,7 @@ export const ReminderOverlay = () => {
                       strokeLinecap="round"
                       strokeDasharray={circumference}
                       strokeDashoffset={dashOffset}
-                      style={{ transition: settings.reducedMotion ? "none" : "stroke-dashoffset 90ms linear" }}
+                      style={{ transition: "none" }}
                     />
                   </svg>
                   {completionVisible ? (
