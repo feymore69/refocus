@@ -15,6 +15,7 @@ struct AppState {
 }
 
 const OVERLAY_GUARD_PREFIX: &str = "overlay-guard-";
+const AUTOSTART_FLAG: &str = "--autostart";
 const OVERLAY_GUARD_BOOTSTRAP_SCRIPT: &str = r#"
 (() => {
   const ROOT_ID = 'refocus-guard-root';
@@ -590,6 +591,10 @@ fn build_tray(app: &App) -> tauri::Result<()> {
     Ok(())
 }
 
+fn launched_from_autostart() -> bool {
+    std::env::args().any(|arg| arg == AUTOSTART_FLAG)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -602,7 +607,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
+            Some(vec![AUTOSTART_FLAG]),
         ))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
@@ -610,6 +615,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             build_tray(app)?;
+            if let Some(window) = app.get_webview_window("main") {
+                if launched_from_autostart() {
+                    let _ = window.hide();
+                } else {
+                    let _ = window.show();
+                }
+            }
             Ok(())
         })
         .on_window_event(|window, event| {

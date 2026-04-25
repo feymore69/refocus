@@ -21,22 +21,6 @@ export const Dashboard = () => {
     stats.weeklyAdherence.length > 0
       ? Math.round(stats.weeklyAdherence.reduce((sum, value) => sum + value, 0) / stats.weeklyAdherence.length)
       : 0;
-  const todayHistory = stats.history.filter((event) => {
-    const date = new Date(event.actualTimestamp ?? event.timestamp);
-    const now = new Date();
-    return (
-      date.getFullYear() === now.getFullYear() &&
-      date.getMonth() === now.getMonth() &&
-      date.getDate() === now.getDate()
-    );
-  });
-  const breakMix = todayHistory.reduce(
-    (acc, item) => {
-      if (item.result === "completed") acc[item.tier] += 1;
-      return acc;
-    },
-    { micro: 0, short: 0, long: 0 },
-  );
   const activePreset =
     SCHEDULE_PRESETS.find(
       (preset) => preset.intervalMinutes === settings.workIntervalMinutes && preset.breakSeconds === settings.breakDurationSeconds,
@@ -132,7 +116,7 @@ export const Dashboard = () => {
 
       <Card className="lg:col-span-3">
         <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Status</p>
-        <div className="mt-3 grid gap-2 md:grid-cols-4">
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
           <div className="rounded-xl border border-white/15 bg-black/10 p-3">
             <p className="text-xs text-[var(--muted)]">Preset</p>
             <p className="text-sm font-medium text-[var(--text)]">{activePreset?.label ?? "Custom schedule"}</p>
@@ -148,10 +132,6 @@ export const Dashboard = () => {
             <p className="text-sm font-medium text-[var(--text)]">
               {settings.workingHoursEnabled ? "Only during schedule" : "All day"}
             </p>
-          </div>
-          <div className="rounded-xl border border-white/15 bg-black/10 p-3">
-            <p className="text-xs text-[var(--muted)]">Break mix</p>
-            <p className="text-sm font-medium text-[var(--text)]">M {breakMix.micro} | S {breakMix.short} | L {breakMix.long}</p>
           </div>
         </div>
       </Card>
