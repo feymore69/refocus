@@ -13,6 +13,22 @@ A polished Tauri desktop app that helps reduce eye strain with timed visual brea
 - Tauri plugins: `store`, `autostart`, `global-shortcut`, `notification`, `window-state`
 - Native tray integration (Rust side)
 
+## Privacy
+
+- Refocus is a local-first desktop app.
+- It stores settings, schedules, reminder state, and break history on the device using Tauri Store.
+- It does not send analytics, break history, keystroke content, clipboard data, screen contents, or work files to a server in this build.
+- The full publish-ready privacy policy is in [PRIVACY.md](PRIVACY.md).
+- Before public release, host that policy at a stable `https://` URL and add your real publisher/support contact details.
+
+## Security baseline
+
+- Tauri capabilities are limited to the features Refocus uses: window control, events, local store, autostart, notifications, and global shortcuts.
+- The unused opener plugin has been removed to reduce attack surface.
+- Tauri now ships with an explicit CSP plus response hardening headers instead of `csp: null`.
+- Sensitive local signing files and `.env` files are ignored by Git via `.gitignore`.
+- The security contact/process for the project is in [SECURITY.md](SECURITY.md).
+
 ## What is implemented
 
 - Onboarding flow:
@@ -137,6 +153,12 @@ git push origin v0.2.0
 ```
 
 The workflow builds desktop bundles on Windows/macOS/Linux and uploads them to a GitHub Release.
+
+### Website / Microsoft Store notes
+
+- For a website download page, host installers and the privacy policy over `https://`.
+- For Microsoft Store EXE/MSI submission, Microsoft currently requires a secure package URL for the installer and may require a privacy policy URL depending on the app and applicable law.
+- The installer URL should be versioned and should not change after submission.
 
 ## Signed builds
 

@@ -439,7 +439,8 @@ export const SettingsView = () => {
           </div>
 
           <div className="mt-3 rounded-xl border border-white/15 bg-black/10 p-3 text-xs text-[var(--muted)]">
-            Privacy: Smart Pause runs locally on this device. Refocus does not upload keystroke content, screen content, or personal work data.
+            Smart Pause uses local reminder state and app interaction timestamps only. Refocus does not record keystroke content,
+            screen contents, clipboard contents, or work files.
           </div>
         </Card>
       ) : null}
@@ -578,7 +579,7 @@ export const SettingsView = () => {
           <div className="mt-3 rounded-xl border border-white/15 bg-black/10 p-3">
             <p className="text-sm font-medium text-[var(--text)]">Custom break lines</p>
             <p className="text-xs text-[var(--muted)]">
-              These rotate with default break headlines. Keep lines short and action-focused.
+              These rotate with default break headlines. Keep lines short, action-focused, and free of sensitive information.
             </p>
             <div className="mt-2 grid gap-2 md:grid-cols-2">
               <input
@@ -698,13 +699,22 @@ export const SettingsView = () => {
             />
           </div>
           <div className="mt-3 rounded-xl border border-white/15 bg-black/10 p-3 text-xs text-[var(--muted)]">
-            <p>Stored locally: settings, break history, and activity-state summaries needed for reminder timing.</p>
-            <p className="mt-1">Never stored or uploaded: keystroke content, screen contents, or work files.</p>
+            <p>Stored locally in Refocus's app data directory: settings, schedules, break history, and reminder timing timestamps.</p>
+            <p className="mt-1">Retention: the latest 200 history entries are kept to power dashboard and history views.</p>
+            <p className="mt-1">Never stored or uploaded: keystroke content, clipboard contents, screen contents, accounts, or work files.</p>
+            <p className="mt-1">Refocus does not include analytics, ads, or cloud sync in this build.</p>
+            <p className="mt-1">Custom break lines are stored locally as plain app data, so avoid entering sensitive personal or client information there.</p>
           </div>
           <div className="mt-3 rounded-xl border border-white/15 bg-black/10 p-3 text-xs text-[var(--muted)]">
             <p>Local history entries: {historyCount}</p>
             <p>First entry: {firstHistoryAt ? new Date(firstHistoryAt).toLocaleString() : "No history yet"}</p>
             <p>Last activity: {lastHistoryAt ? new Date(lastHistoryAt).toLocaleString() : "No history yet"}</p>
+          </div>
+          <div className="mt-3 rounded-xl border border-white/15 bg-black/10 p-3 text-xs text-[var(--muted)]">
+            <p className="font-medium text-[var(--text)]">Privacy policy summary</p>
+            <p className="mt-1">Refocus processes reminder data locally so it can time breaks, show history, and restore your preferences after restart.</p>
+            <p className="mt-1">If you clear local history here, the stored break log is deleted from the device immediately.</p>
+            <p className="mt-1">For distribution, the full policy lives in the repository as <span className="font-mono">PRIVACY.md</span>.</p>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {!confirmClearHistory ? (
@@ -765,12 +775,14 @@ export const SettingsView = () => {
               Custom accent
               <SettingHint text="Override theme accent for action highlights." />
             </span>
-            <input
-              type="color"
-              value={settings.customAccent}
-              onChange={(event) => applySettingsPatch({ customAccent: event.target.value })}
-              className="mt-2 h-10 w-full rounded-xl border border-white/20 bg-black/10 p-1"
-            />
+            <div className="mt-2 rounded-xl border border-white/20 bg-black/10 p-1">
+              <input
+                type="color"
+                value={settings.customAccent}
+                onChange={(event) => applySettingsPatch({ customAccent: event.target.value })}
+                className="h-7 w-full cursor-pointer rounded-full border-0 bg-transparent p-0"
+              />
+            </div>
           </label>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             <Toggle

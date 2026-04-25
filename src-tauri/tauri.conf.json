@@ -24,7 +24,44 @@
       }
     ],
     "security": {
-      "csp": null
+      "freezePrototype": true,
+      "headers": {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Resource-Policy": "same-origin",
+        "Permissions-Policy": {
+          "camera": "()",
+          "display-capture": "()",
+          "fullscreen": "(self)",
+          "geolocation": "()",
+          "microphone": "()",
+          "payment": "()",
+          "publickey-credentials-get": "()",
+          "usb": "()"
+        },
+        "X-Content-Type-Options": "nosniff"
+      },
+      "csp": {
+        "default-src": "'self' customprotocol: asset:",
+        "base-uri": "'self'",
+        "connect-src": "ipc: http://ipc.localhost",
+        "font-src": "'self' asset: http://asset.localhost data:",
+        "frame-src": "'none'",
+        "img-src": "'self' asset: http://asset.localhost blob: data:",
+        "media-src": "'self' asset: http://asset.localhost blob: data:",
+        "object-src": "'none'",
+        "style-src": "'self' 'unsafe-inline'"
+      },
+      "devCsp": {
+        "default-src": "'self' customprotocol: asset: data: blob: http://localhost:1420 http://127.0.0.1:1420 ws://localhost:1420 ws://127.0.0.1:1420",
+        "base-uri": "'self'",
+        "connect-src": "ipc: http://ipc.localhost http://localhost:1420 http://127.0.0.1:1420 ws://localhost:1420 ws://127.0.0.1:1420",
+        "font-src": "'self' asset: http://asset.localhost data: http://localhost:1420 http://127.0.0.1:1420",
+        "frame-src": "'none'",
+        "img-src": "'self' asset: http://asset.localhost blob: data: http://localhost:1420 http://127.0.0.1:1420",
+        "media-src": "'self' asset: http://asset.localhost blob: data: http://localhost:1420 http://127.0.0.1:1420",
+        "object-src": "'none'",
+        "style-src": "'self' 'unsafe-inline' http://localhost:1420 http://127.0.0.1:1420"
+      }
     }
   },
   "bundle": {

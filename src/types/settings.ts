@@ -92,7 +92,6 @@ export interface AppSettings {
   breakTierSettings: BreakTierSettings;
   enabledPromptCategories: BreakPromptCategory[];
   statsWeeklyTrendEnabled: boolean;
-  privacyStatementAccepted: boolean;
 }
 
 export interface SessionState {

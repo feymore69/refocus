@@ -60,7 +60,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   enabledPromptCategories: ["eye", "posture", "breathing", "movement"],
   statsWeeklyTrendEnabled: true,
-  privacyStatementAccepted: false,
 };
 
 export const DEFAULT_SESSION = (): SessionState => {
