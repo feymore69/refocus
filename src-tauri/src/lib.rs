@@ -170,7 +170,9 @@ fn create_overlay_guard_windows(
 
         let guard_window = WebviewWindowBuilder::new(app, label, WebviewUrl::App("overlay-guard.html".into()))
             .initialization_script(OVERLAY_GUARD_BOOTSTRAP_SCRIPT)
+            .background_color(tauri::utils::config::Color(2, 6, 23, 255))
             .decorations(false)
+            .shadow(false)
             .resizable(false)
             .maximizable(false)
             .minimizable(false)
