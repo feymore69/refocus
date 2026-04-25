@@ -214,7 +214,7 @@ export const SettingsView = () => {
               onChange={(value) => applySettingsPatch({ workIntervalMinutes: value })}
             />
             <Range
-              label="Micro break duration"
+              label="Break duration"
               helpText="Length of your standard visual break."
               min={15}
               max={180}
