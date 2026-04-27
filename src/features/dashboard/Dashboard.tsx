@@ -56,11 +56,7 @@ export const Dashboard = () => {
             </motion.div>
           </div>
           <div className="mt-auto flex flex-col justify-end pt-6">
-            {session.isPaused ? (
-              <p className="mb-3 text-sm text-amber-300">Reminders paused</p>
-            ) : (
-              <p className="mb-3 text-sm text-[var(--muted)]">Your next reset will appear automatically when the timer ends.</p>
-            )}
+            {session.isPaused ? <p className="mb-3 text-sm text-amber-300">Reminders paused</p> : null}
             <div className="border-t border-white/10 pt-4">
               <div className="flex flex-wrap items-end gap-2">
                 <Button variant="primary" onClick={() => triggerReminder(true)}>
