@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { AppShell } from "./components/AppShell";
 import { Dashboard } from "./features/dashboard/Dashboard";
-import { Onboarding } from "./features/onboarding/Onboarding";
 import { ReminderOverlay } from "./features/reminder-overlay/ReminderOverlay";
 import { SettingsView } from "./features/settings/SettingsView";
 import { HistoryView } from "./features/stats/HistoryView";
@@ -28,7 +27,6 @@ const scheduler = new SchedulerService({
 
 const App = () => {
   const booted = useAppStore((s) => s.booted);
-  const onboardingComplete = useAppStore((s) => s.onboardingComplete);
   const activeView = useAppStore((s) => s.activeView);
   const setView = useAppStore((s) => s.setView);
   const overlay = useAppStore((s) => s.overlay);
@@ -247,8 +245,6 @@ const App = () => {
     document.body.style.setProperty("--accent", settings.customAccent || theme.accent);
     document.body.style.setProperty("--accent-glow", `${settings.customAccent}66`);
   }, [settings.customAccent, settings.themeId, settings.highContrast, settings.reducedMotion]);
-
-  if (!onboardingComplete) return <Onboarding />;
 
   return (
     <>

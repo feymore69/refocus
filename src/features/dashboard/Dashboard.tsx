@@ -35,7 +35,7 @@ export const Dashboard = () => {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <Card className="h-full lg:col-span-2">
-        <div className="flex min-h-[19rem] flex-col">
+        <div className="flex min-h-[16.75rem] flex-col">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Next break</p>
@@ -55,7 +55,7 @@ export const Dashboard = () => {
               <Timer className="h-6 w-6" />
             </motion.div>
           </div>
-          <div className="mt-auto flex flex-col justify-end pt-6">
+          <div className="mt-auto flex flex-col justify-end pt-4">
             {session.isPaused ? <p className="mb-3 text-sm text-amber-300">Reminders paused</p> : null}
             <div className="border-t border-white/10 pt-4">
               <div className="flex flex-wrap items-end gap-2">

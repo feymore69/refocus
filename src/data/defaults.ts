@@ -95,7 +95,7 @@ export const DEFAULT_STATS = (): StatsState => ({
 });
 
 export const DEFAULT_PERSISTED_STATE = (): PersistedState => ({
-  onboardingComplete: false,
+  onboardingComplete: true,
   settings: DEFAULT_SETTINGS,
   stats: DEFAULT_STATS(),
   session: DEFAULT_SESSION(),
