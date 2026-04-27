@@ -35,12 +35,16 @@ export const Dashboard = () => {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <Card className="h-full lg:col-span-2">
-        <div className="flex min-h-36 flex-col">
+        <div className="flex min-h-[19rem] flex-col">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Next break</p>
               <p className="mt-0.5 text-[5.5rem] leading-none font-semibold text-[var(--text)] tabular-nums">
                 {msToCountdown(msLeft)}
+              </p>
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+                Refocus schedules smart screen breaks around your work rhythm so you can reset your eyes without
+                losing momentum.
               </p>
             </div>
             <motion.div
@@ -51,31 +55,33 @@ export const Dashboard = () => {
               <Timer className="h-6 w-6" />
             </motion.div>
           </div>
-          <div className="mt-auto pt-3">
+          <div className="mt-auto flex flex-col justify-end pt-6">
             {session.isPaused ? (
-              <p className="mb-2 text-sm text-amber-300">Reminders paused</p>
+              <p className="mb-3 text-sm text-amber-300">Reminders paused</p>
             ) : (
-              <p className="mb-2 text-sm text-[var(--muted)]">Smart screen breaks that respect your flow.</p>
+              <p className="mb-3 text-sm text-[var(--muted)]">Your next reset will appear automatically when the timer ends.</p>
             )}
-            <div className="flex flex-wrap items-end gap-2">
-            <Button variant="primary" onClick={() => triggerReminder(true)}>
-              <Sparkle className="h-4 w-4" />
-              Start break now
-            </Button>
-            {session.isPaused ? (
-              <Button onClick={resumeReminders}>
-                <Play className="h-4 w-4" />
-                Resume schedule
-              </Button>
-            ) : (
-              <Button onClick={() => pauseReminders("30m")}>
-                <Pause className="h-4 w-4" />
-                Pause 30 min
-              </Button>
-            )}
-            <Button variant="secondary" onClick={() => pauseReminders("today")}>
-              Pause until tomorrow
-            </Button>
+            <div className="border-t border-white/10 pt-4">
+              <div className="flex flex-wrap items-end gap-2">
+                <Button variant="primary" onClick={() => triggerReminder(true)}>
+                  <Sparkle className="h-4 w-4" />
+                  Start break now
+                </Button>
+                {session.isPaused ? (
+                  <Button onClick={resumeReminders}>
+                    <Play className="h-4 w-4" />
+                    Resume schedule
+                  </Button>
+                ) : (
+                  <Button onClick={() => pauseReminders("30m")}>
+                    <Pause className="h-4 w-4" />
+                    Pause 30 min
+                  </Button>
+                )}
+                <Button variant="secondary" onClick={() => pauseReminders("today")}>
+                  Pause until tomorrow
+                </Button>
+              </div>
             </div>
           </div>
         </div>

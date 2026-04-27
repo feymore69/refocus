@@ -42,54 +42,82 @@ const OVERLAY_GUARD_BOOTSTRAP_SCRIPT: &str = r#"
           font-family: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
           user-select: none;
           cursor: not-allowed;
+          box-sizing: border-box;
           background:
-            radial-gradient(1200px 720px at 20% 30%, rgba(93, 180, 255, 0.24), transparent 62%),
-            radial-gradient(1100px 760px at 78% 40%, rgba(74, 255, 200, 0.22), transparent 62%),
-            linear-gradient(160deg, rgba(11, 24, 52, 0.97), rgba(6, 15, 34, 0.98));
+            radial-gradient(1050px 680px at 18% 24%, rgba(84, 156, 255, 0.26), transparent 60%),
+            radial-gradient(980px 720px at 84% 30%, rgba(76, 226, 202, 0.2), transparent 62%),
+            linear-gradient(160deg, rgba(9, 21, 46, 0.985), rgba(4, 11, 26, 0.99));
+        }
+        *, *::before, *::after {
+          box-sizing: inherit;
         }
         .guard-root {
           position: fixed;
           inset: 0;
-          display: grid;
-          place-items: center;
-          padding: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 32px;
           color: rgba(239, 245, 255, 0.98);
         }
         .guard-card {
-          border-radius: 24px;
-          border: 1px solid rgba(176, 209, 255, 0.28);
-          background: linear-gradient(160deg, rgba(19, 33, 64, 0.7), rgba(11, 19, 38, 0.72));
+          width: min(560px, calc(100vw - 64px));
+          border-radius: 28px;
+          border: 1px solid rgba(176, 209, 255, 0.22);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+            linear-gradient(160deg, rgba(15, 30, 58, 0.8), rgba(9, 18, 37, 0.84));
           box-shadow:
-            0 24px 60px rgba(2, 8, 20, 0.55),
-            inset 0 1px 0 rgba(255, 255, 255, 0.15);
-          backdrop-filter: blur(16px);
-          padding: 28px 30px;
-          max-width: min(500px, 80vw);
+            0 28px 72px rgba(2, 8, 20, 0.5),
+            inset 0 1px 0 rgba(255, 255, 255, 0.12);
+          backdrop-filter: blur(18px);
+          padding: 32px 34px;
           text-align: center;
+        }
+        .guard-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(137, 190, 255, 0.2);
+          background: rgba(11, 22, 43, 0.45);
+          color: rgba(203, 225, 255, 0.9);
+          font-size: 12px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
         .guard-badge {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          height: 42px;
-          width: 42px;
+          height: 44px;
+          width: 44px;
           border-radius: 999px;
-          margin-bottom: 12px;
+          margin: 16px auto 0;
           font-size: 20px;
           background: radial-gradient(circle at 30% 30%, rgba(83, 212, 255, 0.78), rgba(16, 55, 114, 0.8));
           box-shadow: 0 0 22px rgba(76, 194, 255, 0.42);
         }
         .guard-title {
-          margin: 0;
-          font-size: 24px;
+          margin: 18px 0 0;
+          font-size: 28px;
           font-weight: 640;
           letter-spacing: 0.01em;
         }
         .guard-sub {
-          margin: 10px 0 0;
-          font-size: 14px;
-          line-height: 1.55;
+          margin: 12px auto 0;
+          max-width: 38ch;
+          font-size: 15px;
+          line-height: 1.65;
           color: rgba(221, 234, 255, 0.88);
+        }
+        .guard-footnote {
+          margin: 20px auto 0;
+          max-width: 44ch;
+          font-size: 12px;
+          line-height: 1.6;
+          color: rgba(180, 202, 232, 0.68);
         }
       `;
       document.head.appendChild(style);
@@ -104,9 +132,11 @@ const OVERLAY_GUARD_BOOTSTRAP_SCRIPT: &str = r#"
       root.setAttribute('aria-live', 'assertive');
       root.innerHTML = `
         <div class="guard-card">
-          <div class="guard-badge" aria-hidden="true">◉</div>
+          <div class="guard-eyebrow">Refocus lock</div>
+          <div class="guard-badge" aria-hidden="true">◎</div>
           <p class="guard-title">Break in progress</p>
           <p class="guard-sub">Refocus is active on your main display. Return there to continue your break.</p>
+          <p class="guard-footnote">This screen stays here until the active break is completed, snoozed, or skipped on your main monitor.</p>
         </div>
       `;
       document.body.innerHTML = '';
