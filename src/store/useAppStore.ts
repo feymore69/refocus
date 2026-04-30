@@ -7,6 +7,7 @@ import type {
   AppMode,
   AppSettings,
   BreakTier,
+  HistoryRangeFilter,
   OnboardingGoal,
   OnboardingStep,
   OverlayState,
@@ -23,6 +24,7 @@ interface AppStoreState {
   booted: boolean;
   clockMs: number;
   onboardingComplete: boolean;
+  historyRangeFilter: HistoryRangeFilter;
   settings: AppSettings;
   session: SessionState;
   stats: StatsState;
@@ -33,6 +35,7 @@ interface AppStoreState {
   completeOnboarding: () => void;
   setOnboardingGoal: (goal: OnboardingGoal) => void;
   setOnboardingStep: (step: OnboardingStep) => void;
+  setHistoryRangeFilter: (filter: HistoryRangeFilter) => void;
   setView: (view: View) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   updateWeekdaySchedule: (schedule: WeekdaySchedule) => void;
@@ -161,6 +164,7 @@ const buildOverlay = (
     remainingSeconds: breakSeconds,
     scheduledFor: options?.scheduledFor ?? state.session.nextBreakAt,
     autoStarted,
+    userInitiated: !!options?.initiatedByUser,
     snoozeCount: options?.snoozeCount ?? 0,
     message: hasCustomLines ? selectedCustom?.title ?? "Take a short reset" : randomFrom(modeMessages),
     subMessage: hasCustomLines
@@ -179,6 +183,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   booted: false,
   clockMs: Date.now(),
   onboardingComplete: defaultState.onboardingComplete,
+  historyRangeFilter: defaultState.historyRangeFilter,
   settings: defaultState.settings,
   session: defaultState.session,
   stats: defaultState.stats,
@@ -191,6 +196,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     remainingSeconds: defaultState.settings.breakDurationSeconds,
     scheduledFor: null,
     autoStarted: false,
+    userInitiated: false,
     snoozeCount: 0,
     message: "",
     subMessage: "",
@@ -201,6 +207,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set({
       booted: true,
       onboardingComplete: state.onboardingComplete,
+      historyRangeFilter: state.historyRangeFilter,
       settings: state.settings,
       session: state.session,
       stats: {
@@ -216,6 +223,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         remainingSeconds: state.settings.breakDurationSeconds,
         scheduledFor: null,
         autoStarted: false,
+        userInitiated: false,
         snoozeCount: 0,
         message: "",
         subMessage: "",
@@ -224,6 +232,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   completeOnboarding: () => set({ onboardingComplete: true }),
   setOnboardingGoal: (goal) => set((s) => ({ settings: { ...s.settings, onboardingGoal: goal } })),
   setOnboardingStep: (step) => set((s) => ({ settings: { ...s.settings, onboardingStep: step } })),
+  setHistoryRangeFilter: (historyRangeFilter) => set({ historyRangeFilter }),
   setView: (view) => set({ activeView: view }),
   updateSettings: (patch) =>
     set((state) => {
@@ -314,6 +323,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           endsAt: now + state.overlay.durationMs,
           remainingSeconds: Math.max(1, Math.ceil(state.overlay.durationMs / 1000)),
           autoStarted: false,
+          userInitiated: state.overlay.userInitiated,
         },
         session: { ...state.session, pendingDueBreak: false },
       };
@@ -360,6 +370,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           endsAt: null,
           scheduledFor: null,
           autoStarted: false,
+          userInitiated: false,
           snoozeCount: 0,
         },
         session: {
@@ -408,6 +419,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           endsAt: null,
           scheduledFor: null,
           autoStarted: false,
+          userInitiated: false,
           snoozeCount: 0,
         },
         session: {
@@ -427,6 +439,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         endsAt: null,
         scheduledFor: null,
         autoStarted: false,
+        userInitiated: false,
         snoozeCount: 0,
       },
     })),
@@ -448,6 +461,29 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       let nextStats: StatsState = { ...state.stats };
       let nextOverlay = state.overlay;
       const base = { clockMs: now };
+
+      if (!isSameLocalDay(new Date(nextSession.startedAt), nowDate)) {
+        nextSession = {
+          ...nextSession,
+          startedAt: now,
+          nextBreakAt: now + state.settings.workIntervalMinutes * 60_000,
+          activeSecondsToday: 0,
+          longestFocusStreakSeconds: 0,
+          currentFocusStreakSeconds: 0,
+          pendingDueBreak: false,
+          workCyclesCompletedToday: 0,
+        };
+        nextStats = {
+          ...nextStats,
+          completedToday: 0,
+          skippedToday: 0,
+          adherenceRateToday: 0,
+          breaksTakenToday: 0,
+          breaksSkippedToday: 0,
+          activeMinutesToday: 0,
+          longestFocusStreakMinutes: 0,
+        };
+      }
 
       if (nextSession.isPaused && nextSession.pauseUntil && now >= nextSession.pauseUntil) {
         nextSession = {
@@ -526,6 +562,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           endsAt: null,
           scheduledFor: null,
           autoStarted: false,
+          userInitiated: false,
           snoozeCount: 0,
         };
       }
@@ -570,6 +607,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     const state = get();
     return {
       onboardingComplete: state.onboardingComplete,
+      historyRangeFilter: state.historyRangeFilter,
       settings: state.settings,
       session: state.session,
       stats: state.stats,

@@ -18,152 +18,25 @@ const OVERLAY_GUARD_PREFIX: &str = "overlay-guard-";
 const AUTOSTART_FLAG: &str = "--autostart";
 const OVERLAY_GUARD_BOOTSTRAP_SCRIPT: &str = r#"
 (() => {
-  const ROOT_ID = 'refocus-guard-root';
-  const STYLE_ID = 'refocus-guard-style';
-
   const block = (event) => {
     event.preventDefault();
     event.stopPropagation();
   };
 
-  const renderGuard = () => {
-    if (!document.body || !document.head) return;
-
-    if (!document.getElementById(STYLE_ID)) {
-      const style = document.createElement('style');
-      style.id = STYLE_ID;
-      style.textContent = `
-        :root { color-scheme: dark; }
-        html, body {
-          width: 100%;
-          height: 100%;
-          margin: 0;
-          overflow: hidden;
-          font-family: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
-          user-select: none;
-          cursor: not-allowed;
-          box-sizing: border-box;
-          background:
-            radial-gradient(1050px 680px at 18% 24%, rgba(84, 156, 255, 0.26), transparent 60%),
-            radial-gradient(980px 720px at 84% 30%, rgba(76, 226, 202, 0.2), transparent 62%),
-            linear-gradient(160deg, rgba(9, 21, 46, 0.985), rgba(4, 11, 26, 0.99));
-        }
-        *, *::before, *::after {
-          box-sizing: inherit;
-        }
-        .guard-root {
-          position: fixed;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 32px;
-          color: rgba(239, 245, 255, 0.98);
-        }
-        .guard-card {
-          width: min(560px, calc(100vw - 64px));
-          border-radius: 28px;
-          border: 1px solid rgba(176, 209, 255, 0.22);
-          background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
-            linear-gradient(160deg, rgba(15, 30, 58, 0.8), rgba(9, 18, 37, 0.84));
-          box-shadow:
-            0 28px 72px rgba(2, 8, 20, 0.5),
-            inset 0 1px 0 rgba(255, 255, 255, 0.12);
-          backdrop-filter: blur(18px);
-          padding: 32px 34px;
-          text-align: center;
-        }
-        .guard-eyebrow {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 6px 12px;
-          border-radius: 999px;
-          border: 1px solid rgba(137, 190, 255, 0.2);
-          background: rgba(11, 22, 43, 0.45);
-          color: rgba(203, 225, 255, 0.9);
-          font-size: 12px;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-        }
-        .guard-badge {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          height: 44px;
-          width: 44px;
-          border-radius: 999px;
-          margin: 16px auto 0;
-          font-size: 20px;
-          background: radial-gradient(circle at 30% 30%, rgba(83, 212, 255, 0.78), rgba(16, 55, 114, 0.8));
-          box-shadow: 0 0 22px rgba(76, 194, 255, 0.42);
-        }
-        .guard-title {
-          margin: 18px 0 0;
-          font-size: 28px;
-          font-weight: 640;
-          letter-spacing: 0.01em;
-        }
-        .guard-sub {
-          margin: 12px auto 0;
-          max-width: 38ch;
-          font-size: 15px;
-          line-height: 1.65;
-          color: rgba(221, 234, 255, 0.88);
-        }
-        .guard-footnote {
-          margin: 20px auto 0;
-          max-width: 44ch;
-          font-size: 12px;
-          line-height: 1.6;
-          color: rgba(180, 202, 232, 0.68);
-        }
-      `;
-      document.head.appendChild(style);
+  const attach = () => {
+    if (document.body) {
+      document.body.setAttribute('data-refocus-guard', 'true');
     }
-
-    let root = document.getElementById(ROOT_ID);
-    if (!root) {
-      root = document.createElement('div');
-      root.id = ROOT_ID;
-      root.className = 'guard-root';
-      root.setAttribute('role', 'status');
-      root.setAttribute('aria-live', 'assertive');
-      root.innerHTML = `
-        <div class="guard-card">
-          <div class="guard-eyebrow">Refocus lock</div>
-          <div class="guard-badge" aria-hidden="true">◎</div>
-          <p class="guard-title">Break in progress</p>
-          <p class="guard-sub">Refocus is active on your main display. Return there to continue your break.</p>
-          <p class="guard-footnote">This screen stays here until the active break is completed, snoozed, or skipped on your main monitor.</p>
-        </div>
-      `;
-      document.body.innerHTML = '';
-      document.body.appendChild(root);
-    }
-
-    document.body.setAttribute('data-refocus-guard', 'true');
   };
 
   ['contextmenu', 'keydown', 'mousedown', 'mouseup', 'mousemove', 'touchstart', 'touchmove'].forEach((type) => {
     window.addEventListener(type, block, { capture: true, passive: false });
   });
 
-  const start = () => {
-    renderGuard();
-    const observer = new MutationObserver(() => {
-      if (!document.getElementById(ROOT_ID)) {
-        renderGuard();
-      }
-    });
-    observer.observe(document.documentElement, { childList: true, subtree: true });
-  };
-
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start, { once: true });
+    document.addEventListener('DOMContentLoaded', attach, { once: true });
   } else {
-    start();
+    attach();
   }
 })();
 "#;
@@ -324,6 +197,11 @@ fn hide_main_window(app: AppHandle) -> Result<(), String> {
         window.hide().map_err(|err| err.to_string())?;
     }
     Ok(())
+}
+
+#[tauri::command]
+fn was_launched_from_autostart() -> bool {
+    launched_from_autostart()
 }
 
 #[tauri::command]
@@ -628,6 +506,13 @@ fn launched_from_autostart() -> bool {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .manage(AppState {
             quitting: Mutex::new(false),
             close_to_tray: Mutex::new(true),
@@ -684,6 +569,7 @@ pub fn run() {
             quit_app,
             show_main_window,
             hide_main_window,
+            was_launched_from_autostart,
             set_overlay_lock,
             pause_external_media,
             resume_external_media

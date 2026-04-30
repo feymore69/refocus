@@ -181,18 +181,19 @@ export const releaseOverlayWindow = async () => {
   overlaySessionActive = false;
 };
 
-export const dismissOverlayWindow = async (liveInTray: boolean) => {
+export const dismissOverlayWindow = async (hideWindow: boolean) => {
   const window = getCurrentWindow();
-  try {
-    await releaseOverlayWindow();
-  } finally {
+  await releaseOverlayWindow();
+  if (hideWindow) {
     try {
       await window.hide();
     } catch {}
   }
-  if (!liveInTray) {
+  else {
     try {
-      await window.setAlwaysOnTop(false);
+      await window.show();
+      await window.unminimize();
+      await window.setFocus();
     } catch {}
   }
 };

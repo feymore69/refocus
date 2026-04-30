@@ -48,7 +48,6 @@ export const SettingsView = () => {
   const [customDescriptionInput, setCustomDescriptionInput] = useState("");
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
   const [editingMessageValue, setEditingMessageValue] = useState<CustomBreakLine | null>(null);
-  const [extrasOpen, setExtrasOpen] = useState(false);
   const [confirmClearHistory, setConfirmClearHistory] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
 
@@ -579,7 +578,7 @@ export const SettingsView = () => {
           <div className="mt-3 rounded-xl border border-white/15 bg-black/10 p-3">
             <p className="text-sm font-medium text-[var(--text)]">Custom break lines</p>
             <p className="text-xs text-[var(--muted)]">
-              These rotate with default break headlines. Keep lines short, action-focused, and free of sensitive information.
+              Add your own break headlines and descriptions. If custom lines are present, Refocus uses only those lines in the popup rotation.
             </p>
             <div className="mt-2 grid gap-2 md:grid-cols-2">
               <input
@@ -797,25 +796,6 @@ export const SettingsView = () => {
               label="High contrast"
             />
           </div>
-          <details
-            open={extrasOpen}
-            onToggle={(event) => setExtrasOpen(event.currentTarget.open)}
-            className="mt-3 rounded-xl border border-dashed border-white/20 bg-black/10 p-3"
-          >
-            <summary className="cursor-pointer text-sm text-[var(--text)]">Extras (optional)</summary>
-            <div className="mt-2 grid gap-2 md:grid-cols-2">
-              <Toggle
-                checked={settings.sparkleBackground}
-                onChange={(value) => applySettingsPatch({ sparkleBackground: value })}
-                label="Ambient sparkles + glow"
-              />
-              <Toggle
-                checked={settings.mascotMode}
-                onChange={(value) => applySettingsPatch({ mascotMode: value })}
-                label="Mascot mode"
-              />
-            </div>
-          </details>
         </Card>
       ) : null}
     </div>

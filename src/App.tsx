@@ -28,6 +28,7 @@ const scheduler = new SchedulerService({
 const App = () => {
   const booted = useAppStore((s) => s.booted);
   const activeView = useAppStore((s) => s.activeView);
+  const historyRangeFilter = useAppStore((s) => s.historyRangeFilter);
   const setView = useAppStore((s) => s.setView);
   const overlay = useAppStore((s) => s.overlay);
   const settings = useAppStore((s) => s.settings);
@@ -40,14 +41,30 @@ const App = () => {
   const recordInteraction = useAppStore((s) => s.recordInteraction);
   const toPersistedState = useAppStore((s) => s.toPersistedState);
   const previousOverlayPhaseRef = useRef(overlay.phase);
+  const previousOverlayUserInitiatedRef = useRef(overlay.userInitiated);
   const pausedExternalMediaRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
     void (async () => {
-      const loaded = await loadPersistedState();
+      const loaded = (await loadPersistedState()) ?? DEFAULT_PERSISTED_STATE();
+      const launchedFromAutostart = await invoke<boolean>("was_launched_from_autostart").catch(() => false);
       if (!mounted) return;
-      initialize(loaded ?? DEFAULT_PERSISTED_STATE());
+      initialize(
+        launchedFromAutostart
+          ? {
+              ...loaded,
+              session: {
+                ...loaded.session,
+                nextBreakAt: Date.now() + loaded.settings.workIntervalMinutes * 60_000,
+                pendingDueBreak: false,
+                currentFocusStreakSeconds: 0,
+                isIdle: false,
+                lastInteractionAt: Date.now(),
+              },
+            }
+          : loaded,
+      );
       scheduler.start();
     })();
     return () => {
@@ -81,7 +98,7 @@ const App = () => {
       void savePersistedState(toPersistedState());
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [booted, settings, session, overlay.phase, toPersistedState]);
+  }, [booted, settings, session, overlay.phase, historyRangeFilter, toPersistedState]);
 
   useEffect(() => {
     if (!booted) return;
@@ -128,6 +145,7 @@ const App = () => {
   useEffect(() => {
     if (!booted) return;
     const previousPhase = previousOverlayPhaseRef.current;
+    const previousUserInitiated = previousOverlayUserInitiatedRef.current;
     const popupVisible = overlay.phase !== "hidden";
     const enteringPopup = popupVisible && previousPhase === "hidden";
     const enteringCompleting = overlay.phase === "completing" && previousPhase !== "completing";
@@ -161,14 +179,16 @@ const App = () => {
           console.error("Failed to release overlay lock", error);
         }
         try {
-          await dismissOverlayWindow(true);
+          await dismissOverlayWindow(!previousUserInitiated);
         } catch (error) {
           console.error("Failed to dismiss overlay window", error);
         }
-        try {
-          await invoke("hide_main_window");
-        } catch (error) {
-          console.error("Failed to hide main window", error);
+        if (!previousUserInitiated) {
+          try {
+            await invoke("hide_main_window");
+          } catch (error) {
+            console.error("Failed to hide main window", error);
+          }
         }
       })();
     }
@@ -210,10 +230,12 @@ const App = () => {
     }
 
     previousOverlayPhaseRef.current = overlay.phase;
+    previousOverlayUserInitiatedRef.current = overlay.userInitiated;
   }, [
     booted,
     overlay.phase,
     overlay.message,
+    overlay.userInitiated,
     settings.overlayType,
     settings.soundEnabled,
     settings.soundVolume,

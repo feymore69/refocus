@@ -19,68 +19,106 @@ const getStore = () => {
   return storePromise;
 };
 
-const normalizeState = (state: PersistedState): PersistedState => ({
-  ...state,
-  stats: {
-    ...state.stats,
-    history: state.stats.history.map((item) => ({
+const isSameLocalDay = (left: Date, right: Date) =>
+  left.getFullYear() === right.getFullYear() &&
+  left.getMonth() === right.getMonth() &&
+  left.getDate() === right.getDate();
+
+const normalizeState = (state: PersistedState): PersistedState =>
+  (() => {
+    const now = Date.now();
+    const today = new Date(now);
+    const history = state.stats.history.map((item) => ({
       ...item,
       tier: item.tier ?? "micro",
       scheduledTimestamp: item.scheduledTimestamp ?? item.timestamp,
       actualTimestamp: item.actualTimestamp ?? item.timestamp,
       autoStarted: item.autoStarted ?? false,
       snoozeCount: item.snoozeCount ?? 0,
-    })),
-  },
-  settings: {
-    ...state.settings,
-    customMessages: ((state.settings.customMessages as unknown[]) ?? []).map((item) => {
-      if (typeof item === "string") {
-        return {
-          title: item,
-          description: "Look away and reset your focus.",
-        };
-      }
-      if (item && typeof item === "object") {
-        const title = typeof (item as { title?: unknown }).title === "string" ? (item as { title: string }).title : "";
-        const description =
-          typeof (item as { description?: unknown }).description === "string"
-            ? (item as { description: string }).description
-            : "Look away and reset your focus.";
-        return {
-          title: title.trim() || "Take a short reset",
-          description: description.trim() || "Look away and reset your focus.",
-        };
-      }
-      return {
-        title: "Take a short reset",
-        description: "Look away and reset your focus.",
-      };
-    }),
-    smartPause: {
-      ...state.settings.smartPause,
-      activityDetectionEnabled: state.settings.smartPause.activityDetectionEnabled ?? false,
-    },
-    breakTierSettings: {
-      ...state.settings.breakTierSettings,
-      enabledTiers: (() => {
-        const next = (state.settings.breakTierSettings?.enabledTiers ?? ["micro"]).filter(
-          (tier) => tier === "micro" || tier === "long",
-        );
-        if (!next.includes("micro")) next.unshift("micro");
-        return Array.from(new Set(next));
-      })(),
-      shortBreakEvery: clampNumber(state.settings.breakTierSettings?.shortBreakEvery, 2, 20, 4),
-      longBreakEvery: clampNumber(state.settings.breakTierSettings?.longBreakEvery, 4, 20, 10),
-      shortBreakMinutes: clampNumber(state.settings.breakTierSettings?.shortBreakMinutes, 2, 10, 3),
-      longBreakMinutes: clampNumber(state.settings.breakTierSettings?.longBreakMinutes, 10, 30, 12),
-    },
-    enabledPromptCategories:
-      state.settings.enabledPromptCategories && state.settings.enabledPromptCategories.length > 0
-        ? state.settings.enabledPromptCategories
-        : ["eye", "posture", "breathing", "movement"],
-  },
-});
+    }));
+    const lastSessionDate = new Date(state.session.startedAt ?? now);
+    const isFreshDay = !isSameLocalDay(lastSessionDate, today);
+
+    return {
+      ...state,
+      historyRangeFilter:
+        state.historyRangeFilter === "today" ||
+        state.historyRangeFilter === "7d" ||
+        state.historyRangeFilter === "30d" ||
+        state.historyRangeFilter === "all"
+          ? state.historyRangeFilter
+          : "today",
+      stats: {
+        ...state.stats,
+        completedToday: isFreshDay ? 0 : state.stats.completedToday,
+        skippedToday: isFreshDay ? 0 : state.stats.skippedToday,
+        adherenceRateToday: isFreshDay ? 0 : state.stats.adherenceRateToday,
+        breaksTakenToday: isFreshDay ? 0 : state.stats.breaksTakenToday,
+        breaksSkippedToday: isFreshDay ? 0 : state.stats.breaksSkippedToday,
+        activeMinutesToday: isFreshDay ? 0 : state.stats.activeMinutesToday,
+        longestFocusStreakMinutes: isFreshDay ? 0 : state.stats.longestFocusStreakMinutes,
+        history,
+      },
+      session: {
+        ...state.session,
+        startedAt: isFreshDay ? now : state.session.startedAt,
+        nextBreakAt: isFreshDay ? now + state.settings.workIntervalMinutes * 60_000 : state.session.nextBreakAt,
+        activeSecondsToday: isFreshDay ? 0 : state.session.activeSecondsToday,
+        longestFocusStreakSeconds: isFreshDay ? 0 : state.session.longestFocusStreakSeconds,
+        currentFocusStreakSeconds: isFreshDay ? 0 : state.session.currentFocusStreakSeconds,
+        pendingDueBreak: false,
+        workCyclesCompletedToday: isFreshDay ? 0 : state.session.workCyclesCompletedToday,
+      },
+      settings: {
+        ...state.settings,
+        customMessages: ((state.settings.customMessages as unknown[]) ?? []).map((item) => {
+          if (typeof item === "string") {
+            return {
+              title: item,
+              description: "Look away and reset your focus.",
+            };
+          }
+          if (item && typeof item === "object") {
+            const title = typeof (item as { title?: unknown }).title === "string" ? (item as { title: string }).title : "";
+            const description =
+              typeof (item as { description?: unknown }).description === "string"
+                ? (item as { description: string }).description
+                : "Look away and reset your focus.";
+            return {
+              title: title.trim() || "Take a short reset",
+              description: description.trim() || "Look away and reset your focus.",
+            };
+          }
+          return {
+            title: "Take a short reset",
+            description: "Look away and reset your focus.",
+          };
+        }),
+        smartPause: {
+          ...state.settings.smartPause,
+          activityDetectionEnabled: state.settings.smartPause.activityDetectionEnabled ?? false,
+        },
+        breakTierSettings: {
+          ...state.settings.breakTierSettings,
+          enabledTiers: (() => {
+            const next = (state.settings.breakTierSettings?.enabledTiers ?? ["micro"]).filter(
+              (tier) => tier === "micro" || tier === "long",
+            );
+            if (!next.includes("micro")) next.unshift("micro");
+            return Array.from(new Set(next));
+          })(),
+          shortBreakEvery: clampNumber(state.settings.breakTierSettings?.shortBreakEvery, 2, 20, 4),
+          longBreakEvery: clampNumber(state.settings.breakTierSettings?.longBreakEvery, 4, 20, 10),
+          shortBreakMinutes: clampNumber(state.settings.breakTierSettings?.shortBreakMinutes, 2, 10, 3),
+          longBreakMinutes: clampNumber(state.settings.breakTierSettings?.longBreakMinutes, 10, 30, 12),
+        },
+        enabledPromptCategories:
+          state.settings.enabledPromptCategories && state.settings.enabledPromptCategories.length > 0
+            ? state.settings.enabledPromptCategories
+            : ["eye", "posture", "breathing", "movement"],
+      },
+    };
+  })();
 
 export const loadPersistedState = async (): Promise<PersistedState> => {
   try {

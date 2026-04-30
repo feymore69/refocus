@@ -5,6 +5,7 @@ export type ReminderStyle = "gentle" | "normal" | "chaotic";
 export type OverlayType = "fullscreen" | "modal";
 
 export type PauseOption = "1m" | "5m" | "15m" | "30m" | "1h" | "today" | "tomorrow";
+export type HistoryRangeFilter = "today" | "7d" | "30d" | "all";
 
 export type OnboardingGoal = "eye-comfort" | "deep-work" | "posture" | "custom";
 export type OnboardingStep = "goal" | "preset" | "strictness" | "hours" | "test";
@@ -148,6 +149,7 @@ export interface OverlayState {
   remainingSeconds: number;
   scheduledFor: number | null;
   autoStarted: boolean;
+  userInitiated: boolean;
   snoozeCount: number;
   message: string;
   subMessage: string;
@@ -155,6 +157,7 @@ export interface OverlayState {
 
 export interface PersistedState {
   onboardingComplete: boolean;
+  historyRangeFilter: HistoryRangeFilter;
   settings: AppSettings;
   stats: StatsState;
   session: SessionState;

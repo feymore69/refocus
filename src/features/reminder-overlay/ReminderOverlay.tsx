@@ -179,9 +179,7 @@ export const ReminderOverlay = () => {
   const remainingDisplay =
     overlay.phase === "active" ? Math.max(0, Math.ceil(remainingMs / 1000)) : overlay.remainingSeconds;
 
-  const radius = 16;
-  const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference * (1 - ringProgress);
+  const ringDegrees = Math.max(0, Math.min(360, ringProgress * 360));
 
   const isEnforced = settings.strictMode;
   const completionVisible = overlay.phase === "completing";
@@ -238,26 +236,22 @@ export const ReminderOverlay = () => {
               </p>
               <div className="mt-2 flex items-center justify-center gap-4">
                 <div className="relative h-16 w-16">
-                  <svg viewBox="0 0 48 48" className="h-16 w-16 -rotate-90" aria-hidden>
-                    <circle cx="24" cy="24" r={radius} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="4" />
-                    <circle
-                      cx="24"
-                      cy="24"
-                      r={radius}
-                      fill="none"
-                      stroke="rgba(255,255,255,0.95)"
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={dashOffset}
-                      style={{ transition: "none" }}
-                    />
-                  </svg>
+                  <div
+                    className="absolute inset-0 rounded-full p-1"
+                    aria-hidden
+                    style={{
+                      background: `conic-gradient(from -90deg, rgba(255,255,255,0.96) 0deg ${ringDegrees}deg, rgba(255,255,255,0.2) ${ringDegrees}deg 360deg)`,
+                    }}
+                  >
+                    <div className="h-full w-full rounded-full bg-[rgba(9,15,33,0.88)] ring-1 ring-white/12" />
+                  </div>
                   {completionVisible ? (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <CheckCircle2 className="h-8 w-8 text-emerald-200" />
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="absolute inset-0 rounded-full ring-1 ring-white/10" />
+                  )}
                 </div>
                 {completionVisible ? (
                   <p className="text-2xl font-semibold text-emerald-100">Done</p>

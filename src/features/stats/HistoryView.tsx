@@ -2,10 +2,9 @@ import { useMemo, useState } from "react";
 import { Card } from "../../components/ui/card";
 import { Segmented } from "../../components/ui/segmented";
 import { useAppStore } from "../../store/useAppStore";
+import type { HistoryRangeFilter } from "../../types/settings";
 
-type RangeFilter = "today" | "7d" | "30d" | "all";
-
-const rangeOptions: { label: string; value: RangeFilter }[] = [
+const rangeOptions: { label: string; value: HistoryRangeFilter }[] = [
   { label: "Today", value: "today" },
   { label: "7 days", value: "7d" },
   { label: "30 days", value: "30d" },
@@ -42,7 +41,7 @@ const dayHeading = (timestamp: number) => {
   return date.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
 };
 
-const cutoffMs = (filter: RangeFilter) => {
+const cutoffMs = (filter: HistoryRangeFilter) => {
   const now = Date.now();
   if (filter === "today") {
     const today = new Date();
@@ -62,7 +61,8 @@ const badgeClass = (result: "completed" | "skipped" | "snoozed") => {
 
 export const HistoryView = () => {
   const stats = useAppStore((s) => s.stats);
-  const [filter, setFilter] = useState<RangeFilter>("7d");
+  const filter = useAppStore((s) => s.historyRangeFilter);
+  const setFilter = useAppStore((s) => s.setHistoryRangeFilter);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -113,7 +113,7 @@ export const HistoryView = () => {
       <Card>
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs uppercase tracking-wide text-[var(--muted)]">History analytics</p>
-          <Segmented<RangeFilter> value={filter} onChange={setFilter} options={rangeOptions} />
+          <Segmented<HistoryRangeFilter> value={filter} onChange={setFilter} options={rangeOptions} />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
           <div className="rounded-xl border border-white/15 bg-black/10 p-3">
